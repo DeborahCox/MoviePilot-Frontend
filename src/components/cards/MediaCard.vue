@@ -22,7 +22,7 @@ import type { MediaInfo, Site } from '@/api/types'
 import router from '@/router'
 import { useUserStore, useGlobalSettingsStore } from '@/stores'
 import { mediaTypeDict } from '@/api/constants'
-import { buildUserPermissionContext, hasPermission } from '@/utils/permission'
+import { buildUserPermissionContext, hasPermission, hasFeaturePermission, PERMISSION_FEATURE } from '@/utils/permission'
 import { openSharedDialog } from '@/composables/useSharedDialog'
 import {
   getMediaSubscribeId,
@@ -184,6 +184,10 @@ function openSearchSiteDialog() {
 
 // 查询与当前媒体类型兼容的站点
 async function querySites() {
+  if (!hasFeaturePermission(userPermissions.value, PERMISSION_FEATURE.MANAGE_SITE, 'manage')) {
+    allSites.value = []
+    return
+  }
   try {
     const mediaType = props.media?.type === '电视剧' ? 'tv' : props.media?.type === '音乐' ? 'music' : 'movie'
     const data: Site[] = await getSharedConfiguration(`site/media/${mediaType}`)

@@ -8,7 +8,7 @@ import SearchSiteDialog from '@/components/dialog/SearchSiteDialog.vue'
 import { useI18n } from 'vue-i18n'
 import { useDisplay } from 'vuetify'
 import { VDialog, VMenu } from 'vuetify/components'
-import { buildUserPermissionContext, hasPermission, filterMenusByPermission } from '@/utils/permission'
+import { buildUserPermissionContext, hasPermission, hasFeaturePermission, filterMenusByPermission, PERMISSION_FEATURE } from '@/utils/permission'
 import { useMediaSources } from '@/composables/useMediaSources'
 import type { NativePanelEntry, NativePanelSource } from '@/native/registry'
 import { nativePanelId } from '@/native/panel'
@@ -392,6 +392,10 @@ const loadUserSitePreferences = async () => {
 
 /** 查询所有启用站点，并初始化默认选择。 */
 async function queryAllSites() {
+  if (!hasFeaturePermission(userPermissions.value, PERMISSION_FEATURE.MANAGE_SITE, 'manage')) {
+    allSites.value = []
+    return
+  }
   try {
     const data: Site[] = await api.get('site/')
     // 过滤站点，只有启用的站点才显示
@@ -409,6 +413,10 @@ async function queryAllSites() {
 
 /** 查询支持音乐分类的启用站点，并将默认选择收敛到可用范围。 */
 async function queryMusicSites() {
+  if (!hasFeaturePermission(userPermissions.value, PERMISSION_FEATURE.MANAGE_SITE, 'manage')) {
+    allSites.value = []
+    return
+  }
   try {
     const data: Site[] = await api.get('site/media/music')
     allSites.value = data.filter(item => item.is_active)
@@ -426,6 +434,9 @@ async function queryMusicSites() {
 
 /** 打开指定资源类型的站点选择对话框。 */
 async function openSiteDialog(type: 'torrent' | 'subtitle' | 'music' = 'torrent') {
+  if (!hasFeaturePermission(userPermissions.value, PERMISSION_FEATURE.MANAGE_SITE, 'manage')) {
+    return
+  }
   nativeSiteSelection.value = null
   siteSearchType.value = type
   await loadUserSitePreferences()
@@ -813,6 +824,9 @@ const nativeResourceSelections = reactive<Record<NativeResourceType, NativeResou
 
 /** 站点请求按类型隔离；失败保留显式重试，不能把失败当作无站点并搜索全部。 */
 async function loadNativeResourceSites(type: NativeResourceType) {
+  if (!hasFeaturePermission(userPermissions.value, PERMISSION_FEATURE.MANAGE_SITE, 'manage')) {
+    return
+  }
   const state = nativeResourceSelections[type]
   if (state.loading || state.ready) return
   state.loading = true
@@ -837,6 +851,9 @@ async function loadNativeResourceSites(type: NativeResourceType) {
 
 /** 复用站点选择弹窗；各资源类型的临时选择互不覆盖，取消不写回。 */
 function openNativeSiteSelection(type: NativeResourceType) {
+  if (!hasFeaturePermission(userPermissions.value, PERMISSION_FEATURE.MANAGE_SITE, 'manage')) {
+    return
+  }
   const state = nativeResourceSelections[type]
   nativeSiteSelection.value = type
   siteSearchType.value = type
