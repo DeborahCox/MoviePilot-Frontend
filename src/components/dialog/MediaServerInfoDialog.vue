@@ -5,6 +5,8 @@ import { cloneDeep } from 'lodash-es'
 import { useToast } from 'vue-toastification'
 import { useI18n } from 'vue-i18n'
 import { useDisplay } from 'vuetify'
+import { useConnectionTest } from '@/composables/useConnectionTest'
+import ConnectionTestPanel from '@/components/system/ConnectionTestPanel.vue'
 
 // 显示器宽度
 const display = useDisplay()
@@ -37,6 +39,19 @@ const emit = defineEmits(['update:modelValue', 'close', 'done', 'change'])
 
 // 提示框
 const $toast = useToast()
+
+const { state: connectionState, run: runConnectionTest, reset: resetConnectionTest } = useConnectionTest({
+  category: 'mediaserver',
+  snapshotOf: () => ({
+    type: mediaServerInfo.value.type,
+    name: mediaServerInfo.value.name,
+    config: { ...mediaServerInfo.value.config },
+  }),
+  notify: result => {
+    if (result.connected) $toast.success(t('connection.testSuccess'))
+    else $toast.error(t('connection.testFailed'))
+  },
+})
 
 // 媒体服务器详情弹窗
 const mediaServerInfoDialog = computed({
@@ -71,6 +86,7 @@ const ugreenScanModeOptions = computed(() => [
 
 /** 初始化媒体服务器编辑表单数据。 */
 function initializeMediaServerInfo() {
+  resetConnectionTest()
   loadLibrary(props.mediaserver.name)
   mediaServerInfo.value = cloneDeep(props.mediaserver)
   if (mediaServerInfo.value.type === 'ugreen') {
@@ -128,6 +144,12 @@ async function loadLibrary(server: string) {
     console.log(e)
   }
 }
+
+watch(
+  () => [mediaServerInfo.value.name, mediaServerInfo.value.type, mediaServerInfo.value.config],
+  () => resetConnectionTest(),
+  { deep: true },
+)
 
 onMounted(() => {
   initializeMediaServerInfo()
@@ -880,8 +902,21 @@ onMounted(() => {
           </VRow>
         </VForm>
       </VCardText>
+      <VCardText class="pt-0">
+        <ConnectionTestPanel :state="connectionState" />
+      </VCardText>
       <VCardActions class="app-dialog-actions">
         <VSpacer />
+        <VBtn
+          color="info"
+          variant="tonal"
+          @click="runConnectionTest"
+          :loading="connectionState.testing"
+          :disabled="connectionState.testing"
+          prepend-icon="mdi-lan-connect"
+        >
+          {{ t('connection.testButton') }}
+        </VBtn>
         <VBtn color="primary" variant="flat" @click="saveMediaServerInfo" prepend-icon="mdi-content-save" class="px-5">
           {{ t('common.confirm') }}
         </VBtn>

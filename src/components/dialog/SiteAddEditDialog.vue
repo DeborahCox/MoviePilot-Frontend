@@ -7,6 +7,8 @@ import api from '@/api'
 import { getApiBusinessErrorMessage } from '@/api/client'
 import { useDisplay } from 'vuetify'
 import { useI18n } from 'vue-i18n'
+import { useConnectionTest } from '@/composables/useConnectionTest'
+import ConnectionTestPanel from '@/components/system/ConnectionTestPanel.vue'
 
 // 国际化
 const { t } = useI18n()
@@ -41,6 +43,41 @@ const siteForm = ref<Site>({
 
 // 提示框
 const $toast = useToast()
+
+const { state: connectionState, run: runConnectionTest, reset: resetConnectionTest } = useConnectionTest({
+  category: 'site',
+  snapshotOf: () => ({
+    name: siteForm.value?.name,
+    config: {
+      url: siteForm.value?.url,
+      cookie: siteForm.value?.cookie,
+      ua: siteForm.value?.ua,
+      apikey: siteForm.value?.apikey,
+      token: siteForm.value?.token,
+      proxy: siteForm.value?.proxy ? 1 : 0,
+      render: siteForm.value?.render ? 1 : 0,
+      timeout: siteForm.value?.timeout,
+    },
+  }),
+  notify: result => {
+    if (result.connected) $toast.success(t('connection.testSuccess'))
+    else $toast.error(t('connection.testFailed'))
+  },
+})
+
+watch(
+  () => [
+    siteForm.value?.url,
+    siteForm.value?.cookie,
+    siteForm.value?.ua,
+    siteForm.value?.apikey,
+    siteForm.value?.token,
+    siteForm.value?.proxy,
+    siteForm.value?.render,
+    siteForm.value?.timeout,
+  ],
+  () => resetConnectionTest(),
+)
 
 // 维护类型
 const siteType = ref('cookie')
@@ -340,8 +377,21 @@ onMounted(async () => {
           </VRow>
         </VForm>
       </VCardText>
+      <VCardText class="pt-0">
+        <ConnectionTestPanel :state="connectionState" />
+      </VCardText>
       <VCardActions class="app-dialog-actions">
         <VSpacer />
+        <VBtn
+          color="info"
+          variant="tonal"
+          @click="runConnectionTest"
+          :loading="connectionState.testing"
+          :disabled="connectionState.testing"
+          prepend-icon="mdi-lan-connect"
+        >
+          {{ t('connection.testButton') }}
+        </VBtn>
         <VBtn
           v-if="props.oper === 'add'"
           color="primary"
