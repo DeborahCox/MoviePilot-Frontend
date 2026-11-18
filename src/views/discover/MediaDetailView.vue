@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { getSharedConfiguration } from '@/api/configuration'
+import { hasFeaturePermission, PERMISSION_FEATURE } from '@/utils/permission'
 import { getMediaStatus, getMediaSubscribedSeasons } from '@/api/mediaStatus'
 import { getSharedData, invalidateSharedData } from '@/utils/sharedDataCache'
 import { useToast } from 'vue-toastification'
@@ -229,6 +230,10 @@ function openSearchSiteDialog() {
 
 // 查询与当前媒体类型兼容的站点
 async function querySites() {
+  if (!hasFeaturePermission(userPermissions.value, PERMISSION_FEATURE.MANAGE_SITE, 'manage')) {
+    allSites.value = []
+    return
+  }
   try {
     const mediaType = mediaDetail.value.type === '电视剧' ? 'tv' : 'movie'
     const data: Site[] = await getSharedConfiguration(`site/media/${mediaType}`)
