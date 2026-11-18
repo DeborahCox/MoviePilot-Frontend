@@ -6248,4 +6248,12 @@ export default {
     checking: '正在检测服务连接…',
     automatic: '连接成功后将自动进入登录或初始化界面',
   },
+  connection: {
+    testButton: '测试连接',
+    testing: '正在测试…',
+    testSuccess: '连接成功',
+    testFailed: '连接失败',
+    errorLog: '错误日志',
+    errorType: '错误类型',
+  },
 }

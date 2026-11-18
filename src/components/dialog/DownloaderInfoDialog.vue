@@ -5,6 +5,8 @@ import { useToast } from 'vue-toastification'
 import { useI18n } from 'vue-i18n'
 import { useDisplay } from 'vuetify'
 import { useStorageOptions } from '@/composables/useStorageOptions'
+import { useConnectionTest } from '@/composables/useConnectionTest'
+import ConnectionTestPanel from '@/components/system/ConnectionTestPanel.vue'
 
 // 显示器宽度
 const display = useDisplay()
@@ -38,6 +40,19 @@ const $toast = useToast()
 
 // 表单
 const downloaderForm = ref()
+
+const { state: connectionState, run: runConnectionTest, reset: resetConnectionTest } = useConnectionTest({
+  category: 'downloader',
+  snapshotOf: () => ({
+    type: downloaderInfo.value.type,
+    name: downloaderInfo.value.name,
+    config: { ...downloaderInfo.value.config },
+  }),
+  notify: result => {
+    if (result.connected) $toast.success(t('connection.testSuccess'))
+    else $toast.error(t('connection.testFailed'))
+  },
+})
 
 // 下载器详情弹窗
 const downloaderInfoDialog = computed({
@@ -131,6 +146,7 @@ function initializeDownloaderConfigDefaults() {
 
 /** 初始化下载器编辑表单数据。 */
 function initializeDownloaderInfo() {
+  resetConnectionTest()
   downloaderInfo.value = cloneDeep(props.downloader)
   initializeDownloaderConfigDefaults()
   pathMappingRows.value = (downloaderInfo.value.path_mapping || []).map(item => ({
@@ -181,6 +197,12 @@ function addPathMapping() {
 function removePathMapping(index: number) {
   pathMappingRows.value.splice(index, 1)
 }
+
+watch(
+  () => [downloaderInfo.value.name, downloaderInfo.value.type, downloaderInfo.value.config],
+  () => resetConnectionTest(),
+  { deep: true },
+)
 
 onMounted(() => {
   initializeDownloaderInfo()
@@ -538,8 +560,21 @@ onMounted(() => {
           </VRow>
         </VForm>
       </VCardText>
+      <VCardText class="pt-0">
+        <ConnectionTestPanel :state="connectionState" />
+      </VCardText>
       <VCardActions class="app-dialog-actions">
         <VSpacer />
+        <VBtn
+          color="info"
+          variant="tonal"
+          @click="runConnectionTest"
+          :loading="connectionState.testing"
+          :disabled="connectionState.testing"
+          prepend-icon="mdi-lan-connect"
+        >
+          {{ t('connection.testButton') }}
+        </VBtn>
         <VBtn color="primary" variant="flat" @click="saveDownloaderInfo" prepend-icon="mdi-content-save" class="px-5">
           {{ t('common.save') }}
         </VBtn>

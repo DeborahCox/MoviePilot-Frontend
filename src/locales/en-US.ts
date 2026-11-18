@@ -6421,4 +6421,12 @@ export default {
     checking: 'Checking the service connection…',
     automatic: 'You will continue to sign-in or setup automatically once connected',
   },
+  connection: {
+    testButton: 'Test connection',
+    testing: 'Testing…',
+    testSuccess: 'Connection successful',
+    testFailed: 'Connection failed',
+    errorLog: 'Error log',
+    errorType: 'Error type',
+  },
 }

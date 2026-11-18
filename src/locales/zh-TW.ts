@@ -6250,4 +6250,12 @@ export default {
     checking: '正在偵測服務連線…',
     automatic: '連線成功後將自動進入登入或初始化頁面',
   },
+  connection: {
+    testButton: '測試連線',
+    testing: '正在測試…',
+    testSuccess: '連線成功',
+    testFailed: '連線失敗',
+    errorLog: '錯誤日誌',
+    errorType: '錯誤類型',
+  },
 }
