@@ -45,7 +45,7 @@ import {
 const SearchSiteDialog = defineAsyncComponent(() => import('@/components/dialog/SearchSiteDialog.vue'))
 
 // 国际化
-const { t } = useI18n()
+const { t, locale } = useI18n()
 
 const $toast = useToast()
 
@@ -711,6 +711,145 @@ const getEarliestDigitalReleaseDate = computed(() => getEarliestReleaseDateByTyp
 // 获取最早实体发行日期
 const getEarliestPhysicalReleaseDate = computed(() => getEarliestReleaseDateByType(5))
 
+// 金额固定按美元展示，避免随界面语言切换成当地货币符号
+function formatCurrency(value?: number) {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) return ''
+  const formatted = new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(value)
+  // en-US 的 USD 符号仅为 "$"，目标卡片要求显示 "US$"
+  return formatted.startsWith('$') ? `US${formatted}` : formatted
+}
+
+// 源日期为本地日历日期，手动拆分以避免 UTC 解析导致跨时区差一天
+function formatDate(dateStr?: string) {
+  if (!dateStr) return ''
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(dateStr)
+  if (!match) return ''
+  const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]))
+  if (Number.isNaN(date.getTime())) return ''
+  return new Intl.DateTimeFormat(locale.value, {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  }).format(date)
+}
+
+// 地区码转本地化名称（zh-CN：GB → 英国）
+function getRegionName(code?: string) {
+  const iso = (code ?? '').toUpperCase()
+  if (!/^[A-Z]{2}$/.test(iso)) return ''
+  try {
+    const name = new Intl.DisplayNames([locale.value], { type: 'region' }).of(iso)
+    return name && name !== iso ? name : iso
+  } catch {
+    return iso
+  }
+}
+
+// 语言码转本地化名称（zh-CN：en → 英语）
+function getLanguageName(code?: string) {
+  if (!code) return ''
+  try {
+    const name = new Intl.DisplayNames([locale.value], { type: 'language' }).of(code)
+    return name && name !== code ? name : code
+  } catch {
+    return code
+  }
+}
+
+// 评分条文案；无效评分返回空串，由模板 v-if 整体收敛
+const imdbRatingText = computed(() => {
+  const rating = mediaDetail.value.imdbRating
+  return typeof rating === 'number' && rating > 0 && rating <= 10 ? rating.toFixed(1) : ''
+})
+
+const tmdbRatingText = computed(() => {
+  const rating = mediaDetail.value.vote_average
+  return typeof rating === 'number' && rating > 0 ? `${Math.round(rating * 10)}%` : ''
+})
+
+const hasRating = computed(() => Boolean(imdbRatingText.value || tmdbRatingText.value))
+
+const revenueText = computed(() => formatCurrency(mediaDetail.value.revenue))
+const budgetText = computed(() => formatCurrency(mediaDetail.value.budget))
+
+// 上映日期三行：院线首映 / 数字发行 / 实体发行
+const dateLines = computed(() => {
+  const lines: { key: string; icon: string; text: string; ariaLabel: string }[] = []
+  const theatrical = formatDate(mediaDetail.value.release_date || mediaDetail.value.first_air_date)
+  if (theatrical) {
+    lines.push({
+      key: 'theatrical',
+      icon: 'mdi-filmstrip',
+      text: theatrical,
+      ariaLabel: `${t('media.info.releaseDate')}·${theatrical}`,
+    })
+  }
+  const digital = getEarliestDigitalReleaseDate.value
+  const digitalDate = digital ? formatDate(digital.date) : ''
+  if (digitalDate) {
+    const region = getRegionName(digital?.iso_code)
+    lines.push({
+      key: 'digital',
+      icon: 'mdi-cloud-outline',
+      text: digitalDate,
+      ariaLabel: [t('media.info.digitalRelease'), region, digitalDate].filter(Boolean).join('·'),
+    })
+  }
+  const physical = getEarliestPhysicalReleaseDate.value
+  const physicalDate = physical ? formatDate(physical.date) : ''
+  if (physicalDate) {
+    const region = getRegionName(physical?.iso_code)
+    lines.push({
+      key: 'physical',
+      icon: 'mdi-copyright',
+      text: physicalDate,
+      ariaLabel: [t('media.info.physicalRelease'), region, physicalDate].filter(Boolean).join('·'),
+    })
+  }
+  return lines
+})
+
+// 出品国家：优先 TMDB 的 iso_3166_1，回退 origin_country，按 ISO 码去重
+const getProductionCountriesWithFlag = computed(() => {
+  const codes: string[] = []
+  const addCode = (code?: string) => {
+    const iso = (code ?? '').toUpperCase()
+    if (/^[A-Z]{2}$/.test(iso) && !codes.includes(iso)) codes.push(iso)
+  }
+  for (const country of mediaDetail.value.production_countries ?? []) {
+    addCode(country?.iso_3166_1)
+  }
+  for (const code of mediaDetail.value.origin_country ?? []) {
+    addCode(code)
+  }
+  return codes.map(iso => ({
+    iso,
+    name: getRegionName(iso),
+    flag: iso === 'GB' ? 'gb' : iso === 'US' ? 'us' : 'iso',
+  }))
+})
+
+// 任一事实行有值才渲染卡片主体；来源页脚恒渲染
+const hasVisibleFacts = computed(() =>
+  Boolean(
+    hasRating.value ||
+    mediaDetail.value.original_title ||
+    mediaDetail.value.original_name ||
+    mediaDetail.value.status ||
+    dateLines.value.length ||
+    revenueText.value ||
+    budgetText.value ||
+    mediaDetail.value.original_language ||
+    getProductionCountriesWithFlag.value.length ||
+    (mediaDetail.value.production_companies?.length ?? 0) > 0,
+  ),
+)
+
 // 计算存在状态的颜色
 function getExistColor(season: number) {
   const state = seasonsNotExisted.value[season]
@@ -1341,91 +1480,147 @@ useNativePageHeader({
           </div>
         </div>
         <div v-if="mediaDetail.tmdb_id" class="media-overview-right">
-          <div class="media-facts">
-            <div v-if="mediaDetail.vote_average" class="media-ratings">
-              <VRating v-model="mediaDetail.vote_average" density="compact" length="10" class="ma-2" readonly />
-            </div>
-            <div v-if="mediaDetail.tmdb_id" class="media-fact">
-              <span>ID</span>
-              <span class="media-fact-value">{{ mediaDetail.tmdb_id }}</span>
-            </div>
-            <div v-if="mediaDetail.original_title || mediaDetail.original_name" class="media-fact">
-              <span>{{ t('media.info.originalTitle') }}</span>
-              <span class="media-fact-value">{{ mediaDetail.original_title || mediaDetail.original_name }}</span>
-            </div>
-            <div v-if="mediaDetail.status" class="media-fact">
-              <span>{{ t('media.info.status') }}</span>
-              <span class="media-fact-value">{{ mediaDetail.status }}</span>
-            </div>
-            <div v-if="mediaDetail.release_date || mediaDetail.first_air_date" class="media-fact">
-              <span>{{ t('media.info.releaseDate') }}</span>
-              <span class="media-fact-value">
-                <span class="flex items-center justify-end">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke-width="1.5"
-                    stroke="currentColor"
-                    aria-hidden="true"
-                    class="h-4 w-4"
-                  >
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      d="M2.25 15a4.5 4.5 0 004.5 4.5H18a3.75 3.75 0 001.332-7.257 3 3 0 00-3.758-3.848 5.25 5.25 0 00-10.233 2.33A4.502 4.502 0 002.25 15z"
-                    />
-                  </svg>
-                  <span class="ml-1.5">{{ mediaDetail.release_date || mediaDetail.first_air_date }}</span>
-                </span>
-              </span>
-            </div>
-            <div v-if="mediaDetail.type === '电影' && getEarliestDigitalReleaseDate" class="media-fact">
-              <span>{{ t('media.info.digitalRelease') }}</span>
-              <span class="media-fact-value">
-                <span class="flex items-center justify-end">
-                  <span
-                    class="inline-flex items-center justify-center h-4 w-4 text-[0.6rem] font-bold text-current border border-current leading-none"
-                  >
-                    {{ getEarliestDigitalReleaseDate.iso_code }}
-                  </span>
-                  <span class="ml-1.5">{{ getEarliestDigitalReleaseDate.date.slice(0, 10) }}</span>
-                </span>
-              </span>
-            </div>
-            <div v-if="mediaDetail.type === '电影' && getEarliestPhysicalReleaseDate" class="media-fact">
-              <span>{{ t('media.info.physicalRelease') }}</span>
-              <span class="media-fact-value">
-                <span class="flex items-center justify-end">
-                  <span
-                    class="inline-flex items-center justify-center h-4 w-4 text-[0.6rem] font-bold text-current border border-current leading-none"
-                  >
-                    {{ getEarliestPhysicalReleaseDate.iso_code }}
-                  </span>
-                  <span class="ml-1.5">{{ getEarliestPhysicalReleaseDate.date.slice(0, 10) }}</span>
-                </span>
-              </span>
-            </div>
-            <div v-if="mediaDetail.original_language" class="media-fact">
-              <span>{{ t('media.info.originalLanguage') }}</span>
-              <span class="media-fact-value">{{ mediaDetail.original_language }}</span>
-            </div>
-            <div v-if="mediaDetail.production_countries" class="media-fact">
-              <span>{{ t('media.info.productionCountries') }}</span>
-              <span class="media-fact-value">
+          <div class="media-facts media-facts-tmdb">
+            <div v-if="hasVisibleFacts" class="media-facts-body">
+              <div
+                v-if="hasRating"
+                class="media-facts-rating"
+                role="group"
+                :aria-label="`${t('media.info.imdbRating')} / ${t('media.info.tmdbRating')}`"
+              >
                 <span
-                  v-for="country in getProductionCountries"
-                  :key="country"
-                  class="flex items-center justify-end text-end"
+                  v-if="imdbRatingText"
+                  class="media-facts-rating-item"
+                  role="group"
+                  :aria-label="`${t('media.info.imdbRating')} ${imdbRatingText}`"
                 >
-                  {{ country }}
+                  <span class="rating-badge-imdb" aria-hidden="true">IMDb</span>
+                  <span class="media-facts-score num">{{ imdbRatingText }}</span>
                 </span>
-              </span>
+                <span
+                  v-if="tmdbRatingText"
+                  class="media-facts-rating-item"
+                  role="group"
+                  :aria-label="`${t('media.info.tmdbRating')} ${tmdbRatingText}`"
+                >
+                  <svg
+                    width="36"
+                    height="16"
+                    viewBox="0 0 36 16"
+                    aria-hidden="true"
+                    focusable="false"
+                    class="rating-badge-tmdb"
+                  >
+                    <defs>
+                      <linearGradient id="tmdbRatingGradient" x1="0" y1="0" x2="1" y2="0">
+                        <stop offset="0" stop-color="#11B6DD" />
+                        <stop offset="1" stop-color="#86CCA6" />
+                      </linearGradient>
+                    </defs>
+                    <text x="0" y="8" fill="#86CCA6" font-family="Arial, sans-serif" font-size="9" font-weight="800">
+                      TM
+                    </text>
+                    <rect x="17" y="1" width="18" height="6" rx="1" fill="#11B6DD" />
+                    <rect x="1" y="9" width="18" height="6" rx="1" fill="url(#tmdbRatingGradient)" />
+                    <text x="21" y="15" fill="#43C0C6" font-family="Arial, sans-serif" font-size="9" font-weight="800">
+                      DB
+                    </text>
+                  </svg>
+                  <span class="media-facts-score num">{{ tmdbRatingText }}</span>
+                </span>
+              </div>
+              <div v-if="mediaDetail.original_title || mediaDetail.original_name" class="media-fact">
+                <span class="media-fact-key">{{ t('media.info.originalTitle') }}</span>
+                <span class="media-fact-value">{{ mediaDetail.original_title || mediaDetail.original_name }}</span>
+              </div>
+              <div v-if="mediaDetail.status" class="media-fact">
+                <span class="media-fact-key">{{ t('media.info.status') }}</span>
+                <span class="media-fact-value">{{ mediaDetail.status }}</span>
+              </div>
+              <div v-if="dateLines.length" class="media-fact">
+                <span class="media-fact-key">{{ t('media.info.releaseDate') }}</span>
+                <span class="media-fact-value date-stack">
+                  <span
+                    v-for="line in dateLines"
+                    :key="line.key"
+                    class="date-line"
+                    :aria-label="line.ariaLabel"
+                    :title="line.ariaLabel"
+                  >
+                    <VIcon :icon="line.icon" size="16" aria-hidden="true" />
+                    <span class="num">{{ line.text }}</span>
+                  </span>
+                </span>
+              </div>
+              <div v-if="revenueText" class="media-fact">
+                <span class="media-fact-key">{{ t('media.info.revenue') }}</span>
+                <span class="media-fact-value num">{{ revenueText }}</span>
+              </div>
+              <div v-if="budgetText" class="media-fact">
+                <span class="media-fact-key">{{ t('media.info.budget') }}</span>
+                <span class="media-fact-value num">{{ budgetText }}</span>
+              </div>
+              <div v-if="mediaDetail.original_language" class="media-fact">
+                <span class="media-fact-key">{{ t('media.info.originalLanguage') }}</span>
+                <span class="media-fact-value">{{ getLanguageName(mediaDetail.original_language) }}</span>
+              </div>
+              <div v-if="getProductionCountriesWithFlag.length" class="media-fact">
+                <span class="media-fact-key">{{ t('media.info.productionCountries') }}</span>
+                <span class="media-fact-value country-stack">
+                  <span v-for="country in getProductionCountriesWithFlag" :key="country.iso" class="country-line">
+                    <svg
+                      v-if="country.flag === 'gb'"
+                      class="country-flag"
+                      viewBox="0 0 60 36"
+                      aria-hidden="true"
+                      focusable="false"
+                    >
+                      <rect width="60" height="36" fill="#012169" />
+                      <path d="M0 0L60 36M60 0L0 36" stroke="#fff" stroke-width="7" />
+                      <path d="M0 0L60 36M60 0L0 36" stroke="#C8102E" stroke-width="3" />
+                      <path d="M30 0V36M0 18H60" stroke="#fff" stroke-width="11" />
+                      <path d="M30 0V36M0 18H60" stroke="#C8102E" stroke-width="6" />
+                    </svg>
+                    <span v-else-if="country.flag === 'us'" class="country-flag flag-us" aria-hidden="true" />
+                    <span v-else class="country-flag country-flag-iso" aria-hidden="true">{{ country.iso }}</span>
+                    <span>{{ country.name }}</span>
+                  </span>
+                </span>
+              </div>
+              <div v-if="getProductionCompanies?.length" class="media-fact">
+                <span class="media-fact-key">{{ t('media.info.productionCompanies') }}</span>
+                <span class="media-fact-value">
+                  <span v-for="company in getProductionCompanies" :key="company" class="block">{{ company }}</span>
+                </span>
+              </div>
             </div>
-            <div class="media-fact border-b-0">
-              <span>{{ t('media.info.productionCompanies') }}</span>
-              <span class="media-fact-value text-end">
-                <span v-for="company in getProductionCompanies" :key="company" class="block">{{ company }}</span>
+            <div class="media-facts-sources" role="img" :aria-label="t('media.info.dataSource')">
+              <span class="media-fact-source logo-tmdb" role="img" aria-label="The Movie Database">
+                <span>THE MOVIE</span>
+                <span class="logo-tmdb-pill" aria-hidden="true" />
+                <span>DATABASE</span>
+              </span>
+              <span class="media-fact-source" role="img" aria-label="IMDb">
+                <span class="rating-badge-imdb rating-badge-imdb-sm" aria-hidden="true">IMDb</span>
+              </span>
+              <span class="media-fact-source" role="img" aria-label="Red Circle">
+                <svg class="logo-red-circle" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+                  <circle cx="16" cy="16" r="14" fill="none" stroke="#7F1D26" stroke-width="2" />
+                  <circle cx="16" cy="16" r="10.5" fill="none" stroke="#7F1D26" stroke-width="1" />
+                  <path
+                    d="M9 23L16 8L23 23M12 17H20"
+                    fill="none"
+                    stroke="#9E2630"
+                    stroke-width="2.6"
+                    stroke-linejoin="round"
+                  />
+                </svg>
+              </span>
+              <span class="media-fact-source logo-s" role="img" aria-label="S">S</span>
+              <span class="media-fact-source logo-letterboxd" role="img" aria-label="Letterboxd">
+                <span class="logo-letterboxd-dots" aria-hidden="true"> <i /><i /><i /> </span>
+                <span>Letter</span>
+                <span class="logo-letterboxd-underline">boxd</span>
               </span>
             </div>
           </div>
@@ -2096,19 +2291,23 @@ a.crew-name {
 }
 
 .media-overview-right {
+  --media-facts-width: 20rem;
+
   inline-size: 100%;
   margin-block-start: 2rem;
 }
 
 @media (width >= 1024px) {
   .media-overview-right {
-    inline-size: 20rem;
+    inline-size: var(--media-facts-width);
     margin-block-start: 0;
   }
 }
 
 .media-facts {
-  border: 1px solid var(--mp-border);
+  --media-facts-divider: var(--mp-border);
+
+  border: 1px solid var(--media-facts-divider);
   border-radius: var(--app-surface-radius);
   background-color: var(--mp-surface);
   font-size: 0.875rem;
@@ -2117,7 +2316,9 @@ a.crew-name {
 }
 
 .media-detail-glass .media-facts {
-  border-color: var(--glass-border);
+  --media-facts-divider: var(--glass-border);
+
+  border-color: var(--media-facts-divider);
   -webkit-backdrop-filter: var(--glass-surface-backdrop-filter);
   backdrop-filter: var(--glass-surface-backdrop-filter);
   background-color: var(--glass-surface);
@@ -2129,7 +2330,7 @@ a.crew-name {
   display: flex;
   align-items: center;
   justify-content: center;
-  border-block-end: 1px solid var(--mp-border);
+  border-block-end: 1px solid var(--media-facts-divider);
   font-weight: 500;
   padding-block: 0.5rem;
   padding-inline: 1rem;
@@ -2141,6 +2342,251 @@ a.crew-name {
   border-block-end: 1px solid var(--mp-border);
   padding-block: 0.5rem;
   padding-inline: 1rem;
+}
+
+// TMDB 信息卡片：key 左 value 右，评分条与来源页脚独立于事实行
+.media-facts-tmdb .media-facts-rating {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1.375rem;
+  min-block-size: 3.375rem;
+  border-block-end: 1px solid var(--media-facts-divider);
+  padding-block: 0.5rem;
+  padding-inline: 1rem;
+}
+
+.media-facts-rating-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.media-facts-score {
+  color: var(--mp-fg);
+  font-size: 1.125rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.rating-badge-imdb {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-inline-size: 2.25rem;
+  block-size: 1rem;
+  border-radius: 2px;
+  padding-inline: 0.25rem;
+  background: #f6c700;
+  color: #000;
+  font-family: 'Arial Narrow', Impact, sans-serif;
+  font-size: 0.6875rem;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: -0.04em;
+}
+
+.rating-badge-imdb-sm {
+  min-inline-size: 1.875rem;
+  block-size: 0.875rem;
+  font-size: 0.625rem;
+}
+
+.media-facts-tmdb .media-fact {
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  border-block-end: 1px solid var(--media-facts-divider);
+  font-size: 0.9375rem;
+  line-height: 1.375rem;
+  padding-block: 0.875rem;
+  padding-inline: 1.25rem;
+}
+
+.media-facts-body > .media-fact:last-child {
+  border-block-end: 0;
+}
+
+.media-fact-key {
+  flex: none;
+  color: var(--mp-fg);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.media-facts-tmdb .media-fact-value {
+  flex: 1 1 auto;
+  min-inline-size: 0;
+  color: var(--mp-muted-fg);
+  font-weight: 400;
+  text-align: end;
+  overflow-wrap: anywhere;
+}
+
+.date-stack,
+.country-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.25rem;
+}
+
+.date-line {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  white-space: nowrap;
+}
+
+.date-line .v-icon {
+  opacity: 0.9;
+}
+
+.country-line {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.country-flag {
+  flex: none;
+  inline-size: 1.25rem;
+  block-size: 0.875rem;
+  border-radius: 2px;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+}
+
+.country-flag-iso {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--mp-muted);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.flag-us {
+  position: relative;
+  overflow: hidden;
+  background: repeating-linear-gradient(to bottom, #b22234 0 1px, #fff 1px 3px);
+}
+
+.flag-us::before {
+  position: absolute;
+  inset-block-start: 0;
+  inset-block-end: 0;
+  inset-inline-start: 0;
+  inline-size: 40%;
+  block-size: 55%;
+  background: #3c3b6e;
+  content: '';
+}
+
+.media-facts-sources {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1.5rem;
+  min-block-size: 4.5rem;
+  border-block-start: 1px solid var(--media-facts-divider);
+  opacity: 0.92;
+  padding-block: 1rem;
+  padding-inline: 1.25rem;
+}
+
+.media-fact-source {
+  display: inline-flex;
+  flex: none;
+}
+
+.logo-tmdb {
+  flex-direction: column;
+  align-items: center;
+  color: #86cca6;
+  font-size: 0.5625rem;
+  font-weight: 800;
+  line-height: 1.05;
+  letter-spacing: 0.01em;
+}
+
+.logo-tmdb-pill {
+  position: relative;
+  display: block;
+  inline-size: 1.125rem;
+  block-size: 0.375rem;
+  margin-block: 0.0625rem;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #11b6dd, #86cca6);
+}
+
+.logo-tmdb-pill::after {
+  position: absolute;
+  inset-block-start: 50%;
+  inset-inline-start: 50%;
+  inline-size: 0.25rem;
+  block-size: 0.25rem;
+  border-radius: 50%;
+  background: #19202c;
+  content: '';
+  transform: translate(-50%, -50%);
+}
+
+.logo-red-circle {
+  inline-size: 2rem;
+  block-size: 2rem;
+}
+
+.logo-s {
+  align-items: center;
+  justify-content: center;
+  inline-size: 2rem;
+  block-size: 2rem;
+  border-radius: 9px;
+  background: #888b93;
+  color: #263041;
+  font-size: 1.375rem;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.logo-letterboxd {
+  flex-direction: column;
+  align-items: center;
+  inline-size: 1.75rem;
+  block-size: 1.75rem;
+  border-radius: 4px;
+  padding-block-start: 0.1875rem;
+  background: #19202c;
+  color: #fff;
+  font-size: 0.5625rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.logo-letterboxd-dots {
+  display: flex;
+  gap: 2px;
+  margin-block-end: 2px;
+}
+
+.logo-letterboxd-dots i {
+  inline-size: 6px;
+  block-size: 6px;
+  border-radius: 50%;
+  background: #de4c1a;
+}
+
+.logo-letterboxd-dots i:nth-child(2) {
+  background: #00e054;
+}
+
+.logo-letterboxd-dots i:nth-child(3) {
+  background: #40bcf4;
+}
+
+.logo-letterboxd-underline {
+  text-decoration: underline;
 }
 
 .media-overview h2 {

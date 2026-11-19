@@ -1828,6 +1828,11 @@ export default {
       originalLanguage: 'Original Language',
       productionCountries: 'Production Countries',
       productionCompanies: 'Production Companies',
+      revenue: 'Revenue',
+      budget: 'Budget',
+      imdbRating: 'IMDb rating',
+      tmdbRating: 'TMDB rating',
+      dataSource: 'Data source',
       doubanId: 'Douban ID',
     },
     subscribe: {
