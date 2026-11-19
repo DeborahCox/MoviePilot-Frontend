@@ -398,8 +398,10 @@ function updateFilter(values: string[]) {
   gap: 8px;
   min-block-size: 44px;
   padding: 6px 12px;
-  background: rgb(var(--v-theme-surface));
-  border-block-end: 1px solid rgba(var(--v-theme-on-surface), 0.08);
+  background: var(--glass-sheen), var(--glass-overlay-surface, rgb(var(--v-theme-surface)));
+  backdrop-filter: var(--glass-popup-filter, blur(8px) saturate(135%));
+  -webkit-backdrop-filter: var(--glass-popup-filter, blur(8px) saturate(135%));
+  border-block-end: 1px solid var(--glass-border, rgba(var(--v-theme-on-surface), 0.08));
 }
 
 .edition-quick-label {
@@ -430,12 +432,24 @@ function updateFilter(values: string[]) {
 }
 
 .edition-scroll {
-  max-block-size: min(320px, 44vh);
+  max-block-size: min(620px, 64vh);
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding: 5px 0 8px;
+  padding: 5px 2px 8px;
   scrollbar-width: thin;
   scrollbar-color: rgba(var(--v-theme-primary), 0.38) transparent;
+}
+
+/* 分组 = 综合筛选弹窗里的维度子卡（VCard 表面，glass token 全带 fallback） */
+.edition-group {
+  background: var(--glass-v3-card-background, rgba(var(--v-theme-surface-variant), 0.4));
+  backdrop-filter: var(--glass-native-surface-backdrop-filter, none);
+  -webkit-backdrop-filter: var(--glass-native-surface-backdrop-filter, none);
+  border: var(--app-overlay-border, 1px solid rgba(var(--v-theme-on-surface), 0.08));
+  border-radius: var(--app-overlay-radius, 12px);
+  margin-inline: 8px;
+  padding-block-end: 4px;
+  overflow: hidden;
 }
 
 .edition-scroll::-webkit-scrollbar {
@@ -472,7 +486,7 @@ function updateFilter(values: string[]) {
   inline-size: 100%;
   min-block-size: 36px;
   padding: 3px 8px 3px 8px;
-  background: rgb(var(--v-theme-surface));
+  background: transparent;
 }
 
 .edition-group-check {
@@ -574,9 +588,10 @@ function updateFilter(values: string[]) {
   min-block-size: 28px;
   margin: 0;
   padding-inline: 8px;
-  border: 1px solid rgba(var(--v-theme-primary), 0.26);
+  /* 对齐综合筛选弹窗 .filter-chip 源码样式：白字 + 0.2 紫边 */
+  border: 1px solid rgba(var(--v-theme-primary), 0.2);
   background: rgba(var(--v-theme-primary), 0.1) !important;
-  color: rgb(var(--v-theme-primary)) !important;
+  color: rgba(var(--v-theme-on-surface), 0.9) !important;
   font-size: 12px;
   font-weight: 500;
   line-height: 1.2;
