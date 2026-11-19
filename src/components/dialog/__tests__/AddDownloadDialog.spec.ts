@@ -70,6 +70,7 @@ const SelectStub = defineComponent({
 const TextFieldStub = defineComponent({
   name: 'NativeTextFieldStub',
   props: {
+    appendInnerIcon: String,
     disabled: { type: Boolean, default: false },
     label: String,
     modelValue: { type: String, default: '' },
@@ -85,7 +86,9 @@ const TextFieldStub = defineComponent({
           'value': props.modelValue ?? '',
           'onInput': (event: Event) => emit('update:modelValue', (event.target as HTMLInputElement).value),
         }),
-        h('button', { onClick: () => emit('click:append-inner'), type: 'button' }, '查询媒体编号'),
+        props.appendInnerIcon === 'mdi-magnify'
+          ? h('button', { onClick: () => emit('click:append-inner'), type: 'button' }, '查询媒体编号')
+          : null,
       ])
   },
 })
@@ -299,6 +302,7 @@ describe('AddDownloadDialog directories', () => {
     expect(await screen.findByRole('option', { name: '下载器 A' })).toBeInTheDocument()
     expect(screen.getByLabelText('保存目录（自动）')).toHaveValue('')
     expect(screen.getByLabelText('下载器（默认）')).toHaveValue('')
+    expect(screen.getByLabelText('下载器分类（自定义）')).toHaveValue('')
   })
 })
 
@@ -384,6 +388,19 @@ describe('AddDownloadDialog submissions', () => {
     expect(mocks.toastSuccess).toHaveBeenCalledWith('测试站 测试种子 下载成功！')
     expect(mocks.doneNProgress).toHaveBeenCalledOnce()
     expect(submitButton).not.toBeDisabled()
+  })
+
+  it('submits a trimmed custom downloader category when provided', async () => {
+    const submitted = vi.fn()
+    server.use(downloadHandler('download/add', { data: null, message: '', success: true }, 200, submitted))
+    const user = userEvent.setup()
+
+    await renderDialog()
+    await user.type(screen.getByLabelText('下载器分类（自定义）'), '  精选电影  ')
+    await user.click(screen.getByRole('button', { name: '开始下载' }))
+
+    await waitFor(() => expect(submitted).toHaveBeenCalledOnce())
+    expect(submitted.mock.calls[0][0]).toMatchObject({ download_category: '精选电影' })
   })
 
   it('submits the selected album namespace for a music torrent without media context', async () => {

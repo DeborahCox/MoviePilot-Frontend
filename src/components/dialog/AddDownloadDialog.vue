@@ -116,6 +116,9 @@ const selectedDownloader = ref<string | null>(null)
 // 选择的保存目录
 const selectedDirectory = ref<string | null>(null)
 
+// 下载器任务分类：留空时沿用系统按媒体类型推导的分类
+const downloadCategory = ref('')
+
 // 下载器
 const downloaders = ref<Array<Pick<DownloaderConf, 'name' | 'type'>>>([])
 
@@ -287,12 +290,16 @@ async function addDownload() {
       music_type?: Exclude<MusicEntityType, 'artist'>
       allow_unrecognized?: boolean
       save_path: string | null
+      download_category?: string
       torrent_in: TorrentInfo | undefined
     } = {
       torrent_in: props.torrent,
       downloader: selectedDownloader.value,
       save_path: selectedDirectory.value,
     }
+
+    const normalizedDownloadCategory = downloadCategory.value.trim()
+    if (normalizedDownloadCategory) payload.download_category = normalizedDownloadCategory
 
     if (props.media) {
       payload.media_in = props.media
@@ -432,6 +439,20 @@ onMounted(() => {
                 <VListItem v-bind="itemProps" role="option" :title="item.raw.title" />
               </template>
             </VCombobox>
+          </VCol>
+        </VRow>
+        <VRow class="px-5 mt-2">
+          <VCol cols="12">
+            <VTextField
+              v-model="downloadCategory"
+              :label="t('dialog.addDownload.downloadCategory')"
+              :placeholder="t('dialog.addDownload.downloadCategoryPlaceholder')"
+              :hint="t('dialog.addDownload.downloadCategoryHint')"
+              persistent-hint
+              prepend-inner-icon="mdi-shape-outline"
+              variant="underlined"
+              density="comfortable"
+            />
           </VCol>
         </VRow>
         <VRow class="px-5 mt-2">
