@@ -363,7 +363,7 @@ onBeforeUnmount(() => {
 
 <template>
   <section
-    v-if="rows.length"
+    v-if="rows.length && canManageSites"
     class="mpa"
     :class="{ 'mpa--compact': isCompact, 'mpa--expanded': showList }"
     :aria-label="t('search.errors.title', { n: failedCount })"
@@ -608,6 +608,15 @@ onBeforeUnmount(() => {
     <!-- 冷却归零的一次性播报（独立 role="status"，不在倒计时容器内）。 -->
     <span class="mpa__sr-only" role="status" aria-live="polite" aria-atomic="true">{{ readyAnnouncement }}</span>
   </section>
+
+  <section v-else-if="rows.length" class="mpa mpa--restricted" :aria-label="t('search.errors.restrictedHint')">
+    <div class="mpa__head">
+      <VIcon class="mpa__head-icon" icon="mdi-alert" size="16" aria-hidden="true" />
+      <span class="mpa__live" role="status" aria-live="polite" aria-atomic="true">
+        <span class="mpa__title">{{ t('search.errors.restrictedHint') }}</span>
+      </span>
+    </div>
+  </section>
 </template>
 
 <style scoped>
@@ -634,6 +643,10 @@ onBeforeUnmount(() => {
 .mpa--compact .mpa__head {
   min-height: 36px;
   padding: 5px 6px 5px 12px;
+  border-bottom: 0;
+}
+
+.mpa--restricted .mpa__head {
   border-bottom: 0;
 }
 
