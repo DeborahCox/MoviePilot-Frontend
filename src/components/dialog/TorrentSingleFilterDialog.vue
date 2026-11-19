@@ -44,7 +44,8 @@ const options = computed(() => props.filterOptions[props.filterKey] ?? [])
 // 与 PC 浮层共用同一套保守分组；只有版本维度且选项较多时启用。
 const isTieredEdition = computed(() => props.filterKey === 'edition' && options.value.length > 12)
 const editionPanelId = useId()
-const expandedEditionGroups = ref<Set<string>>(new Set())
+/** null = 用户尚未手动操作（按默认规则展开）；Set = 手动状态，允许全部收起。 */
+const expandedEditionGroups = ref<Set<string> | null>(null)
 const editionScrollRef = ref<HTMLElement>()
 const editionFadeVisible = ref(true)
 
@@ -57,21 +58,52 @@ const quickEditionOptions = computed(() =>
   QUICK_EDITION_VALUES.filter(option => editionVisibleOptions.value.includes(option)),
 )
 
+/** 默认展开：含已选值的第一个组，否则第一组；仅用户未手动操作时生效。 */
+function defaultExpandedGroupId(): string | undefined {
+  const withPicked = editionGroups.value.find(group =>
+    group.items.some(item => filterValues.value.includes(item)),
+  )
+  return withPicked?.id ?? editionGroups.value[0]?.id
+}
+
 function isEditionGroupExpanded(group: EditionGroup) {
-  if (group.items.some(item => filterValues.value.includes(item))) return true
-  if (expandedEditionGroups.value.size === 0) return group.id === editionGroups.value[0]?.id
+  if (expandedEditionGroups.value === null) return group.id === defaultExpandedGroupId()
   return expandedEditionGroups.value.has(group.id)
 }
 
+/** 点击组头自由切换该组展开/收起，允许全部收起。 */
 function toggleEditionGroup(id: string) {
-  const next = new Set(expandedEditionGroups.value)
-  if (next.has(id)) next.clear()
-  else {
-    next.clear()
-    next.add(id)
+  if (expandedEditionGroups.value === null) {
+    const initial = defaultExpandedGroupId()
+    expandedEditionGroups.value = new Set(initial ? [initial] : [])
   }
+  const next = new Set(expandedEditionGroups.value)
+  if (next.has(id)) next.delete(id)
+  else next.add(id)
   expandedEditionGroups.value = next
   nextTick(() => updateEditionFade())
+}
+
+/** 组级选框：勾选 = 应用该组全部原串，取消 = 移除该组全部原串。 */
+function groupSelectedCount(group: EditionGroup) {
+  return group.items.filter(item => filterValues.value.includes(item)).length
+}
+
+function isGroupFullySelected(group: EditionGroup) {
+  return group.items.length > 0 && groupSelectedCount(group) === group.items.length
+}
+
+function isGroupPartiallySelected(group: EditionGroup) {
+  const count = groupSelectedCount(group)
+  return count > 0 && count < group.items.length
+}
+
+function setEditionGroupSelected(group: EditionGroup, checked: boolean) {
+  const current = filterValues.value
+  const next = checked
+    ? [...new Set([...current, ...group.items])]
+    : current.filter(item => !group.items.includes(item))
+  updateFilter(next)
 }
 
 function updateEditionFade(event?: Event) {
@@ -145,6 +177,7 @@ function updateFilter(values: string[]) {
           {{ t('torrent.clear') }}
         </VBtn>
         <VBtn
+          v-if="!isTieredEdition"
           class="me-10"
           variant="text"
           size="small"
@@ -190,33 +223,45 @@ function updateFilter(values: string[]) {
                 role="group"
                 :aria-label="`${group.name} 分组`"
               >
-                <button
-                  type="button"
-                  class="edition-group-head"
-                  :aria-expanded="isEditionGroupExpanded(group)"
-                  :aria-controls="`${editionPanelId}-${group.id}`"
-                  :data-group="group.id"
-                  data-testid="edition-group-head"
-                  @click.stop="toggleEditionGroup(group.id)"
-                >
-                  <VIcon icon="mdi-chevron-right" size="x-small" class="edition-group-chev" />
-                  <span class="edition-group-name">{{ group.name }}</span>
-                  <span class="edition-group-picked">
-                    {{ group.items.filter(item => filterValues.includes(item)).slice(0, 2).join(' · ') }}
-                  </span>
-                  <span class="edition-group-spacer" />
-                  <span
-                    v-if="group.items.filter(item => filterValues.includes(item)).length > 0"
-                    class="edition-group-badge"
-                    :aria-label="`已选 ${group.items.filter(item => filterValues.includes(item)).length} 项`"
+                <div class="edition-group-head">
+                  <input
+                    type="checkbox"
+                    class="edition-group-check"
+                    :checked="isGroupFullySelected(group)"
+                    :indeterminate="isGroupPartiallySelected(group)"
+                    :aria-label="`全选 ${group.name}`"
+                    data-testid="edition-group-check"
+                    @click.stop
+                    @change="setEditionGroupSelected(group, ($event.target as HTMLInputElement).checked)"
+                  />
+                  <button
+                    type="button"
+                    class="edition-group-toggle"
+                    :aria-expanded="isEditionGroupExpanded(group)"
+                    :aria-controls="`${editionPanelId}-${group.id}`"
+                    :data-group="group.id"
+                    data-testid="edition-group-head"
+                    @click.stop="toggleEditionGroup(group.id)"
                   >
-                    {{ group.items.filter(item => filterValues.includes(item)).length }}
-                  </span>
-                  <span
-                    v-if="group.id === 'other' && group.items.some(item => filterValues.includes(item))"
-                    class="edition-group-hint"
-                  >含未识别串</span>
-                </button>
+                    <VIcon icon="mdi-chevron-right" size="x-small" class="edition-group-chev" />
+                    <span class="edition-group-name">{{ group.name }}</span>
+                    <span class="edition-group-picked">
+                      {{ group.items.filter(item => filterValues.includes(item)).slice(0, 2).join(' · ') }}
+                    </span>
+                    <span class="edition-group-spacer" />
+                    <span
+                      v-if="groupSelectedCount(group) > 0"
+                      class="edition-group-badge"
+                      :aria-label="`已选 ${groupSelectedCount(group)} 项`"
+                    >
+                      {{ groupSelectedCount(group) }}
+                    </span>
+                    <span
+                      v-if="group.id === 'other' && groupSelectedCount(group) > 0"
+                      class="edition-group-hint"
+                    >含未识别串</span>
+                  </button>
+                </div>
                 <div
                   :id="`${editionPanelId}-${group.id}`"
                   class="edition-group-body"
@@ -423,18 +468,40 @@ function updateFilter(values: string[]) {
   z-index: 1;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   inline-size: 100%;
   min-block-size: 36px;
-  padding: 4px 12px;
-  border: 0;
+  padding: 3px 8px 3px 8px;
   background: rgb(var(--v-theme-surface));
+}
+
+.edition-group-check {
+  flex: 0 0 auto;
+  inline-size: 16px;
+  block-size: 16px;
+  margin: 0;
+  accent-color: rgb(var(--v-theme-primary));
+  cursor: pointer;
+}
+
+.edition-group-toggle {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 6px;
+  min-inline-size: 0;
+  min-block-size: 36px;
+  padding: 4px 4px 4px 0;
+  border: 0;
+  background: transparent;
   color: inherit;
+  font: inherit;
   text-align: left;
   cursor: pointer;
 }
 
-.edition-group-head:hover {
+.edition-group-head:hover .edition-group-toggle,
+.edition-group-toggle:hover {
   background: rgba(var(--v-theme-on-surface), 0.03);
 }
 
@@ -444,7 +511,7 @@ function updateFilter(values: string[]) {
   transition: transform 180ms ease-out;
 }
 
-.edition-group-head[aria-expanded='true'] .edition-group-chev {
+.edition-group-toggle[aria-expanded='true'] .edition-group-chev {
   transform: rotate(90deg);
 }
 
