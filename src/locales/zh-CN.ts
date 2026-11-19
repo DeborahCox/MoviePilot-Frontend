@@ -14,6 +14,7 @@ export default {
       'retrying': '重试中…',
       'noDetail': '无错误详情',
       'noneRetryable': '均需配置，暂无可重试站点',
+      'restrictedHint': '结果可能不完整，部分站点搜索失败',
       'expand': '展开',
       'collapse': '收起',
       'copy': '复制',
