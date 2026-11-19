@@ -702,9 +702,11 @@ function getAniListLink() {
 // 用于无站点 ID 的数据源（Trakt/Simkl/Letterboxd）做标题检索
 const searchSourceTitle = computed(() => mediaDetail.value.original_title || mediaDetail.value.title || '')
 
-// 拼装豆瓣网页地址，图标外链直达条目页
+// 拼装豆瓣地址：有条目 ID 时直达，否则回退标题检索
 function getDoubanLink() {
-  return `https://movie.douban.com/subject/${mediaDetail.value.douban_id}/`
+  const doubanId = mediaDetail.value.douban_id
+  if (doubanId) return `https://movie.douban.com/subject/${doubanId}/`
+  return `https://movie.douban.com/subject_search?search_text=${encodeURIComponent(searchSourceTitle.value)}`
 }
 
 // 拼装 Trakt 地址：有 IMDb ID 时直达条目，否则回退标题检索
@@ -1683,9 +1685,22 @@ useNativePageHeader({
                 aria-label="The Movie Database"
                 title="The Movie Database"
               >
-                <span>THE MOVIE</span>
-                <span class="logo-tmdb-pill" aria-hidden="true" />
-                <span>DATABASE</span>
+                <svg viewBox="0 0 36 16" class="logo-tmdb-badge" aria-hidden="true" focusable="false">
+                  <defs>
+                    <linearGradient id="tmdbFooterGradient" x1="0" y1="0" x2="1" y2="0">
+                      <stop offset="0" stop-color="#11B6DD" />
+                      <stop offset="1" stop-color="#86CCA6" />
+                    </linearGradient>
+                  </defs>
+                  <text x="0" y="8" fill="#86CCA6" font-family="Arial, sans-serif" font-size="9" font-weight="800">
+                    TM
+                  </text>
+                  <rect x="17" y="1" width="18" height="6" rx="1" fill="#11B6DD" />
+                  <rect x="1" y="9" width="18" height="6" rx="1" fill="url(#tmdbFooterGradient)" />
+                  <text x="21" y="15" fill="#43C0C6" font-family="Arial, sans-serif" font-size="9" font-weight="800">
+                    DB
+                  </text>
+                </svg>
               </a>
               <a
                 v-if="mediaDetail.imdb_id"
@@ -1706,15 +1721,10 @@ useNativePageHeader({
                 aria-label="Trakt"
                 title="Trakt"
               >
-                <svg viewBox="0 0 32 32" aria-hidden="true" focusable="false">
-                  <circle cx="16" cy="16" r="14" fill="none" stroke="currentColor" stroke-width="2" />
-                  <circle cx="16" cy="16" r="10.5" fill="none" stroke="currentColor" stroke-width="1" />
+                <svg viewBox="0 0 24 24" class="logo-trakt-mark" aria-hidden="true" focusable="false">
                   <path
-                    d="M9 23L16 8L23 23M12 17H20"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2.6"
-                    stroke-linejoin="round"
+                    fill="currentColor"
+                    d="m15.082 15.107-.73-.73 9.578-9.583a4.499 4.499 0 0 0-.115-.575L13.662 14.382l1.08 1.08-.73.73-1.81-1.81L23.422 3.144c-.075-.15-.155-.3-.25-.44L11.508 14.377l2.154 2.155-.73.73-7.193-7.199.73-.73 4.309 4.31L22.546 1.86A5.618 5.618 0 0 0 18.362 0H5.635A5.637 5.637 0 0 0 0 5.634V18.37A5.632 5.632 0 0 0 5.635 24h12.732C21.477 24 24 21.48 24 18.37V6.19l-8.913 8.918zm-4.314-2.155L6.814 8.988l.73-.73 3.954 3.96zm1.075-1.084-3.954-3.96.73-.73 3.959 3.96zm9.853 5.688a4.141 4.141 0 0 1-4.14 4.14H6.438a4.144 4.144 0 0 1-4.139-4.14V6.438A4.141 4.141 0 0 1 6.44 2.3h10.387v1.04H6.438c-1.71 0-3.099 1.39-3.099 3.1V17.55c0 1.71 1.39 3.105 3.1 3.105h11.117c1.71 0 3.1-1.395 3.1-3.105v-1.754h1.04v1.754z"
                   />
                 </svg>
               </a>
@@ -1741,15 +1751,19 @@ useNativePageHeader({
                 <span class="logo-letterboxd-underline">boxd</span>
               </a>
               <a
-                v-if="mediaDetail.douban_id"
-                class="media-fact-source logo-badge logo-douban"
+                class="media-fact-source logo-douban"
                 :href="getDoubanLink()"
                 target="_blank"
                 rel="noopener noreferrer"
                 aria-label="豆瓣"
                 title="豆瓣"
               >
-                豆瓣
+                <svg viewBox="0 0 24 24" class="logo-douban-mark" aria-hidden="true" focusable="false">
+                  <path
+                    fill="currentColor"
+                    d="M.51 3.06h22.98V.755H.51V3.06Zm20.976 2.537v9.608h-2.137l-1.669 5.76H24v2.28H0v-2.28h6.32l-1.67-5.76H2.515V5.597h18.972Zm-5.066 9.608H7.58l1.67 5.76h5.501l1.67-5.76ZM18.367 7.9H5.634v5.025h12.733V7.9Z"
+                  />
+                </svg>
               </a>
             </div>
           </div>
@@ -2651,38 +2665,13 @@ a.crew-name {
   outline-offset: 2px;
 }
 
-.logo-tmdb {
-  flex-direction: column;
-  color: #86cca6;
-  font-size: 0.5rem;
-  font-weight: 800;
-  line-height: 1.05;
-  letter-spacing: 0.01em;
+/* 与顶部评分条同一款 TMDB 徽标，按底栏尺寸等比缩放 */
+.logo-tmdb-badge {
+  inline-size: 2rem;
+  block-size: 0.875rem;
 }
 
-.logo-tmdb-pill {
-  position: relative;
-  display: block;
-  inline-size: 1rem;
-  block-size: 0.3125rem;
-  margin-block: 0.0625rem;
-  border-radius: 999px;
-  background: linear-gradient(90deg, #11b6dd, #86cca6);
-}
-
-.logo-tmdb-pill::after {
-  position: absolute;
-  inset-block-start: 50%;
-  inset-inline-start: 50%;
-  inline-size: 0.25rem;
-  block-size: 0.25rem;
-  border-radius: 50%;
-  background: #19202c;
-  content: '';
-  transform: translate(-50%, -50%);
-}
-
-/* 通用小徽标：IMDb / 豆瓣 等文字型来源 */
+/* 通用小徽标：IMDb 等文字型来源 */
 .logo-badge {
   min-inline-size: 1.75rem;
   block-size: 0.9375rem;
@@ -2701,10 +2690,14 @@ a.crew-name {
   letter-spacing: -0.04em;
 }
 
+/* 豆瓣官方标识，品牌绿 */
 .logo-douban {
-  background: #2e963d;
-  color: #fff;
-  letter-spacing: 0.02em;
+  color: #2e963d;
+}
+
+.logo-douban-mark {
+  inline-size: 1.125rem;
+  block-size: 1.125rem;
 }
 
 /* Plex 文字标识，保留品牌橙色的 x */
@@ -2720,13 +2713,14 @@ a.crew-name {
   color: #e5a00d;
 }
 
+/* Trakt 官方标识，品牌紫（trakt.tv/branding 现行品牌色） */
 .logo-trakt {
-  color: #ed1c24;
+  color: #6438d0;
 }
 
-.logo-trakt svg {
-  inline-size: 1.25rem;
-  block-size: 1.25rem;
+.logo-trakt-mark {
+  inline-size: 1.125rem;
+  block-size: 1.125rem;
 }
 
 .logo-simkl {
