@@ -521,7 +521,10 @@ useNativePageHeader({
               {{ filterForm[key].length }}
             </VChip>
             <VMenu activator="parent" :close-on-content-click="false" scrim>
-              <VCard :max-width="isTieredEdition(key) ? '26rem' : '20rem'">
+              <VCard
+                :max-width="isTieredEdition(key) ? '30rem' : '20rem'"
+                :class="{ 'edition-menu-card': isTieredEdition(key) }"
+              >
                 <VCardText
                   class="filter-menu-content"
                   :class="{ 'filter-menu-tiered': isTieredEdition(key) }"
@@ -963,13 +966,22 @@ useNativePageHeader({
 }
 
 .filter-menu-content {
-  max-block-size: min(320px, 44vh);
+  max-block-size: min(700px, 70vh);
   overflow-y: auto;
 }
 
+/* 分组面板：消费 glass 弹层 token 对齐综合筛选弹窗材质（非 glass 主题回退实心） */
 .filter-menu-tiered {
   padding: 0;
   overflow: hidden;
+  background: rgb(var(--v-theme-surface));
+}
+
+.edition-menu-card {
+  background-color: var(--glass-overlay-surface, rgb(var(--v-theme-surface))) !important;
+  background-image: var(--glass-sheen) !important;
+  backdrop-filter: var(--glass-dialog-filter, blur(16px) saturate(135%)) !important;
+  -webkit-backdrop-filter: var(--glass-dialog-filter, blur(16px) saturate(135%)) !important;
 }
 
 /* ===== 版本分组清单：chip value 恒为原串，只有展示层分组 ===== */
@@ -1024,8 +1036,10 @@ useNativePageHeader({
   gap: 8px;
   min-block-size: 44px;
   padding: 6px 10px;
-  background: rgb(var(--v-theme-surface));
-  border-block-end: 1px solid rgba(var(--v-theme-on-surface), 0.08);
+  background: var(--glass-sheen), var(--glass-overlay-surface, rgb(var(--v-theme-surface)));
+  backdrop-filter: var(--glass-popup-filter, blur(8px) saturate(135%));
+  -webkit-backdrop-filter: var(--glass-popup-filter, blur(8px) saturate(135%));
+  border-block-end: 1px solid var(--glass-border, rgba(var(--v-theme-on-surface), 0.08));
 }
 
 .edition-quick-label {
@@ -1048,6 +1062,11 @@ useNativePageHeader({
   mask-image: linear-gradient(90deg, transparent, currentColor 16px, currentColor calc(100% - 16px), transparent);
 }
 
+/* Vuetify 给横滚行内非首个 chip 加默认纵向边距，统一归零保证基线水平。 */
+.edition-quick-scroll .v-chip {
+  margin-block: 0;
+}
+
 .edition-quick-scroll::-webkit-scrollbar {
   display: none;
 }
@@ -1057,10 +1076,10 @@ useNativePageHeader({
 }
 
 .edition-scroll {
-  max-block-size: min(320px, 44vh);
+  max-block-size: min(620px, 64vh);
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding: 5px 0 8px;
+  padding: 5px 2px 8px;
   scrollbar-width: thin;
   scrollbar-color: rgba(var(--v-theme-primary), 0.38) transparent;
 }
@@ -1086,7 +1105,19 @@ useNativePageHeader({
 }
 
 .edition-group + .edition-group {
-  margin-block-start: 2px;
+  margin-block-start: 6px;
+}
+
+/* 分组 = 综合筛选弹窗里的维度子卡（VCard 表面，glass token 全带 fallback） */
+.edition-group {
+  background: var(--glass-v3-card-background, rgba(var(--v-theme-surface-variant), 0.4));
+  backdrop-filter: var(--glass-native-surface-backdrop-filter, none);
+  -webkit-backdrop-filter: var(--glass-native-surface-backdrop-filter, none);
+  border: var(--app-overlay-border, 1px solid rgba(var(--v-theme-on-surface), 0.08));
+  border-radius: var(--app-overlay-radius, 12px);
+  margin-inline: 8px;
+  padding-block-end: 4px;
+  overflow: hidden;
 }
 
 .edition-group-head {
@@ -1099,7 +1130,7 @@ useNativePageHeader({
   inline-size: 100%;
   min-block-size: 28px;
   padding: 2px 6px 2px 6px;
-  background: rgb(var(--v-theme-surface));
+  background: transparent;
 }
 
 .edition-group-check {
@@ -1201,9 +1232,10 @@ useNativePageHeader({
   min-block-size: 28px;
   margin: 0;
   padding-inline: 8px;
-  border: 1px solid rgba(var(--v-theme-primary), 0.26);
+  /* 对齐综合筛选弹窗 .filter-chip 源码样式：白字 + 0.2 紫边 */
+  border: 1px solid rgba(var(--v-theme-primary), 0.2);
   background: rgba(var(--v-theme-primary), 0.1) !important;
-  color: rgb(var(--v-theme-primary)) !important;
+  color: rgba(var(--v-theme-on-surface), 0.9) !important;
   font-size: 12px;
   font-weight: 500;
   line-height: 1.2;
