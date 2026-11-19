@@ -816,14 +816,22 @@ function getRegionName(code?: string) {
   }
 }
 
+// 非标准/历史遗留语言码兜底映射（TMDB 部分条目使用 cn 等码，Intl.DisplayNames 解析不到）
+const LANGUAGE_CODE_ALIASES: Record<string, string> = {
+  cn: 'zh', // 中文（TMDB 旧数据）
+  tw: 'zh', // 中文（台湾繁体）
+  hk: 'zh', // 中文（香港）
+}
+
 // 语言码转本地化名称（zh-CN：en → 英语）
 function getLanguageName(code?: string) {
   if (!code) return ''
+  const normalized = LANGUAGE_CODE_ALIASES[code.toLowerCase()] ?? code
   try {
-    const name = new Intl.DisplayNames([locale.value], { type: 'language' }).of(code)
-    return name && name !== code ? name : code
+    const name = new Intl.DisplayNames([locale.value], { type: 'language' }).of(normalized)
+    return name && name !== normalized ? name : normalized
   } catch {
-    return code
+    return normalized
   }
 }
 
