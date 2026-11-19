@@ -1280,8 +1280,16 @@ onBeforeUnmount(() => {
     font-size: 12.5px;
   }
 
+  /* 摘要行改为两行：标题与按钮第一行，聚合 chips 独占第二行可横向滑动。 */
+  .mpa__head {
+    flex-wrap: wrap;
+    row-gap: 6px;
+  }
+
   .mpa__live {
-    flex: 1;
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
   }
 
   .mpa__line1 {
@@ -1298,6 +1306,21 @@ onBeforeUnmount(() => {
   .mpa__chips {
     overflow-x: auto;
     scrollbar-width: none;
+  }
+
+  .mpa__chips--head {
+    flex: 1 1 100%;
+    order: 10;
+    padding-bottom: 1px;
+  }
+
+  /* 关键：chip 不被压缩，否则窄屏下会被挤扁导致文字重叠。 */
+  .mpa__chip {
+    flex: 0 0 auto;
+  }
+
+  .mpa__actions {
+    margin-inline-start: auto;
   }
 
   .mpa__chips::-webkit-scrollbar {
