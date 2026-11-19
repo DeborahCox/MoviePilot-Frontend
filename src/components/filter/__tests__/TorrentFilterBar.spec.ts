@@ -1,6 +1,7 @@
 import TorrentFilterBar from '@/components/filter/TorrentFilterBar.vue'
 import { fireEvent, screen } from '@testing-library/vue'
 import { renderWithProviders } from '@tests/support/render'
+import { groupEditionOptions } from '@/utils/editionGroup'
 import { defineComponent, h } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -329,7 +330,7 @@ describe('TorrentFilterBar tiered edition panel', () => {
     result.unmount()
   })
 
-  it('toggles one original string at a time and keeps a single manually opened group', async () => {
+  it('toggles one original string at a time and lets groups expand and collapse freely', async () => {
     const { container, emitted } = await renderWithProviders(TorrentFilterBar, {
       props: propsFor({
         filterForm: { ...defaultProps.filterForm, edition: [], releaseGroup: [] },
@@ -343,6 +344,11 @@ describe('TorrentFilterBar tiered edition panel', () => {
     await fireEvent.click(bdHead as HTMLElement)
     expect(bdHead).toHaveAttribute('aria-expanded', 'true')
     await fireEvent.click(webdlHead as HTMLElement)
+    // 自由多开：打开新组不收起已展开的组
+    expect(bdHead).toHaveAttribute('aria-expanded', 'true')
+    expect(webdlHead).toHaveAttribute('aria-expanded', 'true')
+    // 再次点击已展开的组头可直接收起
+    await fireEvent.click(bdHead as HTMLElement)
     expect(bdHead).toHaveAttribute('aria-expanded', 'false')
     expect(webdlHead).toHaveAttribute('aria-expanded', 'true')
 
@@ -350,6 +356,38 @@ describe('TorrentFilterBar tiered edition panel', () => {
     expect(chip).not.toBeNull()
     await fireEvent.click(chip as HTMLElement)
     expect(emitted()['update:filterForm']).toEqual([['edition', ['WEB-DL HDR']]])
+  })
+
+  it('selects and clears an entire group via the group checkbox', async () => {
+    const { container, emitted } = await renderWithProviders(TorrentFilterBar, {
+      props: propsFor({
+        filterForm: { ...defaultProps.filterForm, edition: [], releaseGroup: [] },
+      }),
+      global: { stubs },
+    })
+
+    const bdItems = groupEditionOptions(editionOptions).find(group => group.id === 'bd')?.items ?? []
+    expect(bdItems.length).toBeGreaterThan(0)
+
+    const bdCheck = container.querySelector<HTMLElement>('[data-testid="edition-group-check"][aria-label="全选 蓝光"]')
+    expect(bdCheck).not.toBeNull()
+    await fireEvent.click(bdCheck as HTMLElement)
+    expect(emitted()['update:filterForm']).toEqual([['edition', bdItems]])
+
+    // 再次点击取消全选 → 该组值全部移除
+    await fireEvent.click(bdCheck as HTMLElement)
+    expect(emitted()['update:filterForm']).toEqual([['edition', bdItems], ['edition', []]])
+  })
+
+  it('hides the panel-level select-all button for tiered edition', async () => {
+    const { container } = await renderWithProviders(TorrentFilterBar, { props: propsFor(), global: { stubs } })
+
+    // 分组面板头部不应再有「全选」（全选所有选项等价于不过滤，无意义）
+    const head = container.querySelector('.edition-head') as HTMLElement
+    expect(head).not.toBeNull()
+    expect(head.textContent).not.toContain('全选')
+    // 其他维度（平铺模式）仍保留全选
+    expect(screen.getAllByRole('button', { name: '全选' }).length).toBeGreaterThan(0)
   })
 
   it('keeps other dimensions flat even when they have more than twelve options', async () => {
