@@ -6,7 +6,6 @@ import { openSharedDialog } from '@/composables/useSharedDialog'
 import { useNativePageHeader } from '@/native/page'
 import {
   groupEditionOptions,
-  QUICK_EDITION_VALUES,
   type EditionGroup,
 } from '@/utils/editionGroup'
 
@@ -92,9 +91,6 @@ const editionVisibleOptions = computed(() => [
   ...new Set([...(props.filterOptions.edition ?? []), ...(props.filterForm.edition ?? [])]),
 ])
 const editionGroups = computed(() => groupEditionOptions(editionVisibleOptions.value))
-const quickEditionOptions = computed(() =>
-  QUICK_EDITION_VALUES.filter(option => editionVisibleOptions.value.includes(option)),
-)
 
 /** 默认展开：含已选值的第一个组，否则第一组；仅用户未手动操作时生效。 */
 function defaultExpandedGroupId(): string | undefined {
@@ -520,11 +516,8 @@ useNativePageHeader({
             <VChip v-if="filterForm[key].length > 0" size="small" color="primary" class="ms-1" variant="elevated">
               {{ filterForm[key].length }}
             </VChip>
-            <VMenu activator="parent" :close-on-content-click="false" scrim>
-              <VCard
-                :max-width="isTieredEdition(key) ? '30rem' : '20rem'"
-                :class="{ 'edition-menu-card': isTieredEdition(key) }"
-              >
+            <VMenu activator="parent" :close-on-content-click="false" scrim class="edition-filter-overlay">
+              <VCard :max-width="isTieredEdition(key) ? '30rem' : '20rem'">
                 <VCardText
                   class="filter-menu-content"
                   :class="{ 'filter-menu-tiered': isTieredEdition(key) }"
@@ -547,30 +540,6 @@ useNativePageHeader({
                       >
                         {{ t('torrent.clear') }}
                       </VBtn>
-                    </div>
-
-                    <div class="edition-quick">
-                      <span class="edition-quick-label">常用</span>
-                      <div class="edition-quick-scroll">
-                        <VChip
-                          v-for="option in quickEditionOptions"
-                          :key="option"
-                          :value="option"
-                          filter
-                          variant="elevated"
-                          size="small"
-                          class="edition-chip edition-chip--neutral edition-chip--quick"
-                          :class="{ 'v-chip--selected': filterForm.edition.includes(option) }"
-                          role="checkbox"
-                          :aria-checked="filterForm.edition.includes(option)"
-                          :aria-label="`按版本 ${option} 筛选`"
-                          :data-value="option"
-                          data-testid="edition-chip"
-                          @click.stop="toggleEditionValue(option)"
-                        >
-                          <span class="edition-chip-label">{{ option }}</span>
-                        </VChip>
-                      </div>
                     </div>
 
                     <div class="edition-scroll-wrap">
@@ -977,14 +946,7 @@ useNativePageHeader({
 .filter-menu-tiered {
   padding: 0;
   overflow: hidden;
-  background: rgb(var(--v-theme-surface));
-}
-
-.edition-menu-card {
-  background-color: var(--glass-overlay-surface, rgb(var(--v-theme-surface))) !important;
-  background-image: var(--glass-sheen) !important;
-  backdrop-filter: var(--glass-dialog-filter, blur(16px) saturate(135%)) !important;
-  -webkit-backdrop-filter: var(--glass-dialog-filter, blur(16px) saturate(135%)) !important;
+  background: transparent;
 }
 
 /* ===== 版本分组清单：chip value 恒为原串，只有展示层分组 ===== */
@@ -1028,50 +990,6 @@ useNativePageHeader({
 .edition-action {
   min-width: 0;
   padding-inline: 6px;
-}
-
-.edition-quick {
-  position: sticky;
-  top: 0;
-  z-index: 2;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-block-size: 44px;
-  padding: 6px 10px;
-  background: var(--glass-sheen), var(--glass-overlay-surface, rgb(var(--v-theme-surface)));
-  backdrop-filter: var(--glass-popup-filter, blur(8px) saturate(135%));
-  -webkit-backdrop-filter: var(--glass-popup-filter, blur(8px) saturate(135%));
-  border-block-end: 1px solid var(--glass-border, rgba(var(--v-theme-on-surface), 0.08));
-}
-
-.edition-quick-label {
-  flex: 0 0 auto;
-  color: rgba(var(--v-theme-on-surface), 0.4);
-  font-size: 10px;
-  font-weight: 400;
-}
-
-.edition-quick-scroll {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex: 1;
-  min-inline-size: 0;
-  overflow-x: auto;
-  padding-block: 2px;
-  scrollbar-width: none;
-  -webkit-mask-image: linear-gradient(90deg, transparent, currentColor 16px, currentColor calc(100% - 16px), transparent);
-  mask-image: linear-gradient(90deg, transparent, currentColor 16px, currentColor calc(100% - 16px), transparent);
-}
-
-/* Vuetify 给横滚行内非首个 chip 加默认纵向边距，统一归零保证基线水平。 */
-.edition-quick-scroll .v-chip {
-  margin-block: 0;
-}
-
-.edition-quick-scroll::-webkit-scrollbar {
-  display: none;
 }
 
 .edition-scroll-wrap {
@@ -1248,12 +1166,12 @@ useNativePageHeader({
   align-items: center;
   gap: 7px;
   inline-size: 100%;
-  min-block-size: 28px;
+  min-block-size: 26px;
   margin: 0;
-  padding-inline: 8px;
+  padding-inline: 10px;
   /* 对齐综合筛选弹窗 .filter-chip 源码样式：白字 + 0.2 紫边 */
   border: 1px solid rgba(var(--v-theme-primary), 0.2);
-  background: rgba(var(--v-theme-primary), 0.1) !important;
+  background-color: rgba(var(--v-theme-primary), 0.1) !important;
   color: rgba(var(--v-theme-on-surface), 0.9) !important;
   font-size: 12px;
   font-weight: 500;
@@ -1269,7 +1187,7 @@ useNativePageHeader({
 }
 
 .edition-chip:hover {
-  background: rgba(var(--v-theme-primary), 0.15) !important;
+  background-color: rgba(var(--v-theme-primary), 0.15) !important;
 }
 
 .edition-chip--neutral {
@@ -1281,11 +1199,6 @@ useNativePageHeader({
 .edition-chip--neutral:hover {
   background: rgba(var(--v-theme-on-surface), 0.07) !important;
   color: rgb(var(--v-theme-on-surface)) !important;
-}
-
-.edition-chip--quick {
-  inline-size: auto;
-  flex: 0 0 auto;
 }
 
 .edition-chip--unknown {
@@ -1324,8 +1237,7 @@ useNativePageHeader({
 }
 
 .edition-chip.v-chip--selected {
-  border-color: transparent;
-  background: rgba(var(--v-theme-primary), 0.85) !important;
+  background-color: rgba(var(--v-theme-primary), 0.85) !important;
   /* 对齐源码 .filter-chip.v-chip--selected 微投影 */
   box-shadow: 0 2px 4px rgba(var(--v-theme-primary), 0.3);
   color: rgb(var(--v-theme-on-primary)) !important;

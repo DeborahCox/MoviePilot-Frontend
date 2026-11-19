@@ -2,7 +2,6 @@ import {
   EDITION_GROUP_NAMES,
   EDITION_GROUP_ORDER,
   groupEditionOptions,
-  QUICK_EDITION_VALUES,
 } from '@/utils/editionGroup'
 import { describe, expect, it } from 'vitest'
 
@@ -118,6 +117,5 @@ describe('groupEditionOptions', () => {
     expect(new Set(grouped).size).toBe(values.length)
     expect(grouped.slice().sort()).toEqual(values.slice().sort())
     expect(groups.reduce((total, group) => total + group.items.length, 0)).toBe(values.length)
-    expect(QUICK_EDITION_VALUES.every(value => values.includes(value))).toBe(true)
   })
 })
