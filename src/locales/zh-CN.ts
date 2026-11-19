@@ -1796,6 +1796,11 @@ export default {
       originalLanguage: '原始语言',
       productionCountries: '出品国家',
       productionCompanies: '制作公司',
+      revenue: '收入',
+      budget: '电影成本',
+      imdbRating: 'IMDb 评分',
+      tmdbRating: 'TMDB 评分',
+      dataSource: '数据来源',
       doubanId: '豆瓣ID',
     },
     subscribe: {

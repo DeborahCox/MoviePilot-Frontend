@@ -576,6 +576,12 @@ export interface MediaInfo {
   poster_path?: string
   // 评分
   vote_average?: number
+  // IMDb 聚合评分（十分制）
+  imdbRating?: number
+  // 电影成本（USD）
+  budget?: number
+  // 收入（USD）
+  revenue?: number
   // 描述
   overview?: string
   // 媒体库目录分类
