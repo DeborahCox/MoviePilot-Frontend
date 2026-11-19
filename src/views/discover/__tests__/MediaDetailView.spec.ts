@@ -413,7 +413,10 @@ describe('MediaDetailView detail and actions', () => {
       'href',
       'https://www.themoviedb.org/movie/8401',
     )
-    expect(screen.getByRole('link', { name: /IMDb/ })).toHaveAttribute('href', 'https://www.imdb.com/title/tt08401')
+    expect(within(screen.getByTestId('media-source-links')).getByRole('link', { name: /IMDb/ })).toHaveAttribute(
+      'href',
+      'https://www.imdb.com/title/tt08401',
+    )
     expect(screen.getByRole('link', { name: /TheTvDb/ })).toHaveAttribute(
       'href',
       'https://www.thetvdb.com/series/tvdb-8401',
@@ -427,7 +430,7 @@ describe('MediaDetailView detail and actions', () => {
     expect(screen.getByLabelText('媒体入口 推荐')).toHaveAttribute('data-api-path', 'tmdb/recommend/8401/电影')
     expect(screen.getByLabelText('媒体入口 类似')).toHaveAttribute('data-api-path', 'tmdb/similar/8401/电影')
 
-    await fireEvent.click(screen.getByText('豆瓣'))
+    await fireEvent.click(within(screen.getByTestId('media-source-links')).getByText('豆瓣'))
     expect(mocks.openDoubanApp).toHaveBeenCalledWith('db-8401', '电影', '链接电影', '2025')
   })
 
@@ -444,6 +447,42 @@ describe('MediaDetailView detail and actions', () => {
       'href',
       'https://www.thetvdb.com/series/speed-and-love',
     )
+  })
+
+  it('renders footer source icons as external links for the media', async () => {
+    const media = createMediaInfo({
+      douban_id: 'db-8401',
+      imdb_id: 'tt08401',
+      original_title: '',
+      title: '链接电影',
+      tmdb_id: 8401,
+      type: '电影',
+      year: 2025,
+    })
+    await renderDetail({ media })
+
+    const sources = within(await screen.findByTestId('media-facts-sources'))
+    expect(sources.getByRole('link', { name: 'The Movie Database' })).toHaveAttribute(
+      'href',
+      'https://www.themoviedb.org/movie/8401',
+    )
+    expect(sources.getByRole('link', { name: 'IMDb' })).toHaveAttribute('href', 'https://www.imdb.com/title/tt08401')
+    expect(sources.getByRole('link', { name: '豆瓣' })).toHaveAttribute(
+      'href',
+      'https://movie.douban.com/subject/db-8401/',
+    )
+    // 有 IMDb ID 时 Trakt 直达条目，缺失时回退标题检索
+    expect(sources.getByRole('link', { name: 'Trakt' })).toHaveAttribute('href', 'https://trakt.tv/search/imdb/tt08401')
+    expect(sources.getByRole('link', { name: 'Simkl' })).toHaveAttribute(
+      'href',
+      expect.stringContaining('simkl.com/search/?q='),
+    )
+    expect(sources.getByRole('link', { name: 'Letterboxd' })).toHaveAttribute(
+      'href',
+      expect.stringContaining('letterboxd.com/search/'),
+    )
+    // 未入库到 Plex 时不展示 Plex 图标
+    expect(sources.queryByRole('button', { name: 'Plex' })).not.toBeInTheDocument()
   })
 
   it('renders Douban-only facts, deep link, image, credits, and recommendations', async () => {
@@ -473,7 +512,7 @@ describe('MediaDetailView detail and actions', () => {
     expect(screen.getByLabelText('人物入口 douban')).toHaveAttribute('data-api-path', 'douban/credits/db-8402/电影')
     expect(screen.getByLabelText('媒体入口 推荐')).toHaveAttribute('data-api-path', 'douban/recommend/db-8402/电影')
 
-    await fireEvent.click(screen.getByText('豆瓣'))
+    await fireEvent.click(within(screen.getByTestId('media-source-links')).getByText('豆瓣'))
     expect(mocks.openDoubanApp).toHaveBeenCalledWith('db-8402', '电影', '豆瓣独立电影', '2026')
   })
 
