@@ -265,40 +265,43 @@ function updateFilter(values: string[]) {
                 <div
                   :id="`${editionPanelId}-${group.id}`"
                   class="edition-group-body"
+                  :class="{ 'edition-group-body--expanded': isEditionGroupExpanded(group) }"
+                  :inert="!isEditionGroupExpanded(group) || undefined"
                   role="region"
                   :aria-label="`${group.name} 选项`"
-                  :hidden="!isEditionGroupExpanded(group)"
                 >
-                  <VChip
-                    v-for="option in group.items"
-                    :key="option"
-                    :value="option"
-                    filter
-                    variant="elevated"
-                    size="small"
-                    class="edition-chip edition-chip--group"
-                    :class="{
-                      'edition-chip--unknown': group.id === 'other',
-                      'v-chip--selected': filterValues.includes(option),
-                    }"
-                    role="checkbox"
-                    :aria-checked="filterValues.includes(option)"
-                    :aria-label="`按版本 ${option} 筛选`"
-                    :data-value="option"
-                    data-testid="edition-chip"
-                    @click.stop="toggleEditionValue(option)"
-                  >
-                    <VIcon
-                      v-if="group.id === 'other'"
-                      icon="mdi-help-circle-outline"
-                      size="x-small"
-                      class="edition-chip-mark"
-                    />
-                    <span class="edition-chip-label">{{ option }}</span>
-                    <svg class="edition-chip-check" viewBox="0 0 24 24" aria-hidden="true">
-                      <path d="M9,16.17L4.83,12L3.41,13.41L9,19L21,7L19.59,5.59L9,16.17Z" />
-                    </svg>
-                  </VChip>
+                  <div class="edition-group-body-inner">
+                    <VChip
+                      v-for="option in group.items"
+                      :key="option"
+                      :value="option"
+                      filter
+                      variant="elevated"
+                      size="small"
+                      class="edition-chip edition-chip--group"
+                      :class="{
+                        'edition-chip--unknown': group.id === 'other',
+                        'v-chip--selected': filterValues.includes(option),
+                      }"
+                      role="checkbox"
+                      :aria-checked="filterValues.includes(option)"
+                      :aria-label="`按版本 ${option} 筛选`"
+                      :data-value="option"
+                      data-testid="edition-chip"
+                      @click.stop="toggleEditionValue(option)"
+                    >
+                      <VIcon
+                        v-if="group.id === 'other'"
+                        icon="mdi-help-circle-outline"
+                        size="x-small"
+                        class="edition-chip-mark"
+                      />
+                      <span class="edition-chip-label">{{ option }}</span>
+                      <svg class="edition-chip-check" viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M9,16.17L4.83,12L3.41,13.41L9,19L21,7L19.59,5.59L9,16.17Z" />
+                      </svg>
+                    </VChip>
+                  </div>
                 </div>
               </div>
             </div>
@@ -575,7 +578,23 @@ function updateFilter(values: string[]) {
   white-space: nowrap;
 }
 
+/* 分组展开：max-height 不可行的未知高度用 grid 0fr/1fr 过渡（180ms ease-out 手风琴规范），
+   折叠时 body 惰性（inert）保证内部 chip 不可聚焦，键盘 tab 语义与 hidden 等价 */
 .edition-group-body {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transition: grid-template-rows 180ms ease-out, opacity 180ms ease-out;
+}
+
+.edition-group-body--expanded {
+  grid-template-rows: 1fr;
+  opacity: 1;
+}
+
+.edition-group-body-inner {
+  min-block-size: 0;
+  overflow: hidden;
   padding: 2px 12px 6px 28px;
 }
 
@@ -598,6 +617,7 @@ function updateFilter(values: string[]) {
   text-align: left;
   white-space: normal;
   overflow-wrap: anywhere;
+  transition: all 0.2s ease;
 }
 
 .edition-chip + .edition-chip {
@@ -611,7 +631,7 @@ function updateFilter(values: string[]) {
 }
 
 .edition-chip:hover {
-  background: rgba(var(--v-theme-primary), 0.17) !important;
+  background: rgba(var(--v-theme-primary), 0.15) !important;
 }
 
 .edition-chip--neutral {
@@ -651,12 +671,17 @@ function updateFilter(values: string[]) {
   min-inline-size: 0;
 }
 
+/* ✓ 图标显隐：宽度 0→12px + 透明度过渡，对照 VChip filter 图标展开动画；
+   margin-inline-start -7px 抵消未选中时 gap 占位，布局与 display:none 时一致 */
 .edition-chip-check {
-  display: none;
-  inline-size: 12px;
-  block-size: 12px;
-  fill: rgb(var(--v-theme-on-primary));
   flex: 0 0 auto;
+  inline-size: 0;
+  block-size: 12px;
+  margin-inline-start: -7px;
+  overflow: hidden;
+  opacity: 0;
+  fill: rgb(var(--v-theme-on-primary));
+  transition: inline-size 0.2s ease, margin-inline-start 0.2s ease, opacity 0.2s ease;
 }
 
 .edition-chip-mark {
@@ -667,14 +692,20 @@ function updateFilter(values: string[]) {
 .edition-chip.v-chip--selected {
   border-color: transparent;
   background: rgba(var(--v-theme-primary), 0.85) !important;
+  /* 对齐源码 .filter-chip.v-chip--selected 微投影 */
+  box-shadow: 0 2px 4px rgba(var(--v-theme-primary), 0.3);
   color: rgb(var(--v-theme-on-primary)) !important;
   font-weight: 600;
 }
 
 .edition-chip.v-chip--selected .edition-chip-check,
 .edition-chip.v-chip--selected .edition-chip-mark {
-  display: block;
   opacity: 0.9;
+}
+
+.edition-chip.v-chip--selected .edition-chip-check {
+  inline-size: 12px;
+  margin-inline-start: 0;
 }
 
 .edition-chip.v-chip--selected .edition-chip-mark {
@@ -687,15 +718,18 @@ function updateFilter(values: string[]) {
   outline-offset: 2px;
 }
 
+/* 选中态 chip 焦点描边按既有规范（TorrentCard .filter-tag-chip）外移到 offset 6 */
+.edition-chip.v-chip--selected:focus-visible {
+  outline-offset: 6px;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .edition-group-chev,
+  .edition-group-body,
   .edition-chip,
+  .edition-chip-check,
   .edition-fade {
     transition: none;
-  }
-
-  .edition-chip.v-chip--selected .edition-chip-check {
-    display: block;
   }
 }
 </style>
