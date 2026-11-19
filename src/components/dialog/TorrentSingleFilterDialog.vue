@@ -3,7 +3,6 @@ import { useId } from 'vue'
 import { useI18n } from 'vue-i18n'
 import {
   groupEditionOptions,
-  QUICK_EDITION_VALUES,
   type EditionGroup,
 } from '@/utils/editionGroup'
 
@@ -54,10 +53,6 @@ const editionVisibleOptions = computed(() => [
   ...new Set([...options.value, ...filterValues.value]),
 ])
 const editionGroups = computed(() => groupEditionOptions(editionVisibleOptions.value))
-const quickEditionOptions = computed(() =>
-  QUICK_EDITION_VALUES.filter(option => editionVisibleOptions.value.includes(option)),
-)
-
 /** 默认展开：含已选值的第一个组，否则第一组；仅用户未手动操作时生效。 */
 function defaultExpandedGroupId(): string | undefined {
   const withPicked = editionGroups.value.find(group =>
@@ -190,30 +185,6 @@ function updateFilter(values: string[]) {
       <VDivider />
       <VCardText :class="{ 'filter-menu-tiered': isTieredEdition }">
         <div v-if="isTieredEdition" class="edition-panel" role="dialog" aria-label="质量筛选">
-          <div class="edition-quick">
-            <span class="edition-quick-label">常用</span>
-            <div class="edition-quick-scroll">
-              <VChip
-                v-for="option in quickEditionOptions"
-                :key="option"
-                :value="option"
-                filter
-                variant="elevated"
-                size="small"
-                class="edition-chip edition-chip--neutral edition-chip--quick"
-                :class="{ 'v-chip--selected': filterValues.includes(option) }"
-                role="checkbox"
-                :aria-checked="filterValues.includes(option)"
-                :aria-label="`按版本 ${option} 筛选`"
-                :data-value="option"
-                data-testid="edition-chip"
-                @click.stop="toggleEditionValue(option)"
-              >
-                <span class="edition-chip-label">{{ option }}</span>
-              </VChip>
-            </div>
-          </div>
-
           <div class="edition-scroll-wrap">
             <div ref="editionScrollRef" class="edition-scroll" @scroll.passive="updateEditionFade">
               <div
@@ -392,44 +363,6 @@ function updateFilter(values: string[]) {
   font-weight: 600;
 }
 
-.edition-quick {
-  position: sticky;
-  top: 0;
-  z-index: 2;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-block-size: 44px;
-  padding: 6px 12px;
-  background: var(--glass-sheen), var(--glass-overlay-surface, rgb(var(--v-theme-surface)));
-  backdrop-filter: var(--glass-popup-filter, blur(8px) saturate(135%));
-  -webkit-backdrop-filter: var(--glass-popup-filter, blur(8px) saturate(135%));
-  border-block-end: 1px solid var(--glass-border, rgba(var(--v-theme-on-surface), 0.08));
-}
-
-.edition-quick-label {
-  flex: 0 0 auto;
-  color: rgba(var(--v-theme-on-surface), 0.4);
-  font-size: 10px;
-}
-
-.edition-quick-scroll {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex: 1;
-  min-inline-size: 0;
-  overflow-x: auto;
-  padding-block: 2px;
-  scrollbar-width: none;
-  -webkit-mask-image: linear-gradient(90deg, transparent, currentColor 16px, currentColor calc(100% - 16px), transparent);
-  mask-image: linear-gradient(90deg, transparent, currentColor 16px, currentColor calc(100% - 16px), transparent);
-}
-
-.edition-quick-scroll::-webkit-scrollbar {
-  display: none;
-}
-
 .edition-scroll-wrap {
   position: relative;
 }
@@ -604,12 +537,12 @@ function updateFilter(values: string[]) {
   align-items: center;
   gap: 7px;
   inline-size: 100%;
-  min-block-size: 28px;
+  min-block-size: 26px;
   margin: 0;
-  padding-inline: 8px;
+  padding-inline: 10px;
   /* 对齐综合筛选弹窗 .filter-chip 源码样式：白字 + 0.2 紫边 */
   border: 1px solid rgba(var(--v-theme-primary), 0.2);
-  background: rgba(var(--v-theme-primary), 0.1) !important;
+  background-color: rgba(var(--v-theme-primary), 0.1) !important;
   color: rgba(var(--v-theme-on-surface), 0.9) !important;
   font-size: 12px;
   font-weight: 500;
@@ -620,18 +553,18 @@ function updateFilter(values: string[]) {
   transition: all 0.2s ease;
 }
 
-.edition-chip + .edition-chip {
+.edition-group .edition-chip + .edition-chip {
   margin-block-start: 12px;
 }
 
-.edition-chip:not(.edition-chip--quick)::before {
+.edition-chip::before {
   content: '';
   position: absolute;
   inset: -6px 0;
 }
 
 .edition-chip:hover {
-  background: rgba(var(--v-theme-primary), 0.15) !important;
+  background-color: rgba(var(--v-theme-primary), 0.15) !important;
 }
 
 .edition-chip--neutral {
@@ -643,15 +576,6 @@ function updateFilter(values: string[]) {
 .edition-chip--neutral:hover {
   background: rgba(var(--v-theme-on-surface), 0.07) !important;
   color: rgb(var(--v-theme-on-surface)) !important;
-}
-
-.edition-chip--quick {
-  inline-size: auto;
-  flex: 0 0 auto;
-}
-
-.edition-chip--quick::before {
-  content: none;
 }
 
 .edition-chip--unknown {
@@ -690,8 +614,7 @@ function updateFilter(values: string[]) {
 }
 
 .edition-chip.v-chip--selected {
-  border-color: transparent;
-  background: rgba(var(--v-theme-primary), 0.85) !important;
+  background-color: rgba(var(--v-theme-primary), 0.85) !important;
   /* 对齐源码 .filter-chip.v-chip--selected 微投影 */
   box-shadow: 0 2px 4px rgba(var(--v-theme-primary), 0.3);
   color: rgb(var(--v-theme-on-primary)) !important;

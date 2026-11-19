@@ -312,6 +312,8 @@ describe('TorrentFilterBar tiered edition panel', () => {
     const result = await renderWithProviders(TorrentFilterBar, { props: propsFor(), global: { stubs } })
 
     expect(result.container.querySelectorAll('.edition-panel')).toHaveLength(1)
+    // 常用栏已删除（用户裁决）：面板内不允许再出现 quick 行
+    expect(result.container.querySelectorAll('.edition-quick')).toHaveLength(0)
     expect(
       Array.from(result.container.querySelectorAll<HTMLElement>('[data-testid="edition-group-head"]')).map(
         head => head.querySelector('.edition-group-name')?.textContent?.trim(),

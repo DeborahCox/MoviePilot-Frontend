@@ -498,6 +498,13 @@ $-custom-content-surfaces: (
       --glass-overlay-backdrop-filter: var(--glass-dialog-filter);
     }
 
+    // 「质量」分组浮层按弹窗档位取阅读扩散：与 .v-dialog 同构的 token 换档，
+    // 材质画笔（backdrop/背景/高光）仍由系统在卡片层统一执行，各外观档自动跟随。
+    .v-menu.edition-filter-overlay > .v-overlay__content {
+      --glass-overlay-blur: var(--glass-dialog-blur);
+      --glass-overlay-backdrop-filter: var(--glass-dialog-filter);
+    }
+
     // Vuetify 子表面会重新声明主题强调度，阅读层需在实际文字所在的主题边界保持对比。
     :is(#{$-popup-hosts}) .v-theme--glass {
       --v-medium-emphasis-opacity: 0.9;
@@ -527,6 +534,14 @@ $-custom-content-surfaces: (
     }
 
     .v-dialog > .v-overlay__scrim {
+      background: rgba(12, 14, 18, 0.16);
+      backdrop-filter: blur(3px);
+      -webkit-backdrop-filter: blur(3px);
+    }
+
+    // 「质量」分组浮层 scrim 与弹窗同款：轻暗 + 3px 预模糊。
+    .v-menu.edition-filter-overlay > .v-overlay__scrim {
+      --v-overlay-opacity: 1;
       background: rgba(12, 14, 18, 0.16);
       backdrop-filter: blur(3px);
       -webkit-backdrop-filter: blur(3px);

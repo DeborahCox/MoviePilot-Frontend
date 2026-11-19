@@ -21,16 +21,6 @@ export const EDITION_GROUP_NAMES = {
 
 export const EDITION_GROUP_ORDER: ReadonlyArray<EditionGroup['id']> = ['uhd', 'bd', 'webdl', 'web', 'other']
 
-/** 高频原串白名单；只与当前可见选项求交集，不改变字符串本身。 */
-export const QUICK_EDITION_VALUES = [
-  'UHD BluRay REMUX',
-  'WEB-DL HDR',
-  'UHD BluRay',
-  'BluRay HDR',
-  'WEB-DL HDR10+',
-  'UHD BluRay REMUX DV',
-] as const
-
 type Medium = 'uhd-blu-ray' | 'blu-ray-plus' | 'blu-ray' | 'web-dl' | 'web' | 'uhd'
 
 /** 介质词按长度优先匹配；匹配后从剩余文本中剔除，避免父子词重复计数。 */
