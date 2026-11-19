@@ -23,6 +23,7 @@ const $toast = useToast()
 
 // 路由
 const route = useRoute()
+const router = useRouter()
 
 // APP 模式检测
 const { appMode } = usePWA()
@@ -82,31 +83,59 @@ const filterOptions = computed(() => [
   { value: 'unknown', label: t('site.connectionUnknown'), icon: 'mdi-help-circle', color: 'secondary' },
 ])
 
+// 关键词过滤：资源搜索页的「去配置 / 去更新」跳转到 /site?q=<站点名>，这里读出并用于定位站点。
+const queryFilter = computed(() => {
+  const raw = route.query.q
+  const value = Array.isArray(raw) ? raw[0] : raw
+  return (value ?? '').toString().trim()
+})
+const normalizedQuery = computed(() => queryFilter.value.toLowerCase())
+// 状态筛选与关键词过滤任一命中都算「列表是子集」，拖拽排序据此关闭。
+const hasActiveFilter = computed(() => filterOption.value !== 'all' || Boolean(normalizedQuery.value))
+
+/** 站点名或域名包含关键词即命中（不区分大小写）。 */
+function matchesQueryFilter(site: Site) {
+  const query = normalizedQuery.value
+  if (!query) return true
+  return site.name.toLowerCase().includes(query) || site.domain.toLowerCase().includes(query)
+}
+
+/** 清除关键词过滤：只替换 query，不新增历史记录。 */
+function clearQueryFilter() {
+  if (!queryFilter.value) return
+  const query = { ...route.query }
+  delete query.q
+  void router.replace({ query })
+}
+
 // 筛选后的站点列表
 const filteredSiteList = computed(() => {
-  if (filterOption.value === 'all') {
-    return siteList.value
-  }
-  return siteList.value.filter(site => {
-    if (filterOption.value === 'active') {
-      return site.is_active
-    } else if (filterOption.value === 'inactive') {
-      return !site.is_active
-    } else if (['connected', 'slow', 'failed', 'unknown'].includes(filterOption.value)) {
-      const connectionStatus = getConnectionStatus(site.domain)
-      return connectionStatus === filterOption.value
-    }
-    return true
-  })
+  const statusFiltered =
+    filterOption.value === 'all'
+      ? siteList.value
+      : siteList.value.filter(site => {
+          if (filterOption.value === 'active') {
+            return site.is_active
+          } else if (filterOption.value === 'inactive') {
+            return !site.is_active
+          } else if (['connected', 'slow', 'failed', 'unknown'].includes(filterOption.value)) {
+            const connectionStatus = getConnectionStatus(site.domain)
+            return connectionStatus === filterOption.value
+          }
+          return true
+        })
+  // 关键词过滤与状态筛选叠加（AND），而不是替换：从资源搜索页跳过来时仍可再按状态筛。
+  return normalizedQuery.value ? statusFiltered.filter(matchesQueryFilter) : statusFiltered
 })
 
 // 用于拖拽排序的列表
 const draggableSiteList = computed({
   get() {
-    return filterOption.value === 'all' ? siteList.value : filteredSiteList.value
+    // 有任何筛选时只能展示子集；拖拽会重排隐藏站点，因此筛选态只读（canDragSort 同时为 false）。
+    return hasActiveFilter.value ? filteredSiteList.value : siteList.value
   },
   set(value) {
-    if (filterOption.value === 'all') {
+    if (!hasActiveFilter.value) {
       siteList.value = value
     }
   },
@@ -124,7 +153,7 @@ const siteUserDataMap = computed<Record<string, SiteUserData | undefined>>(() =>
   return map
 })
 
-const canDragSort = computed(() => sortMode.value && filterOption.value === 'all')
+const canDragSort = computed(() => sortMode.value && !hasActiveFilter.value)
 const shouldVirtualizeList = computed(() => !canDragSort.value)
 
 // 当前筛选选项的显示信息
@@ -210,8 +239,8 @@ function getConnectionStatus(domain: string) {
 
 // 保存站点排序
 async function savaSitesPriority() {
-  // 只在显示全部站点时允许排序
-  if (filterOption.value !== 'all' || savingPriority.value) {
+  // 只在显示全部站点时允许排序（状态筛选或关键词过滤都会隐藏站点，重排会打乱其顺序）
+  if (hasActiveFilter.value || savingPriority.value) {
     return
   }
 
@@ -259,7 +288,7 @@ function selectFilter(value: string) {
 }
 
 function toggleSortMode() {
-  if (filterOption.value !== 'all') return
+  if (hasActiveFilter.value) return
   sortMode.value = !sortMode.value
 }
 
@@ -361,6 +390,13 @@ watch(
   },
   { immediate: true },
 )
+
+// 关键词过滤生效时同样退出排序模式，避免拖拽在隐藏站点的情况下保存顺序。
+watch(normalizedQuery, value => {
+  if (value && sortMode.value) {
+    sortMode.value = false
+  }
+})
 
 const shouldShowFloatingActions = computed(() => route.path === '/site' && isRefreshed.value && canManage.value)
 
@@ -479,7 +515,12 @@ useNativePageHeader({
           </VCard>
         </VMenu>
         <!-- 排序按钮 -->
-        <IconBtn variant="text" :color="sortMode ? 'warning' : 'gray'" @click="toggleSortMode">
+        <IconBtn
+          variant="text"
+          :color="sortMode ? 'warning' : 'gray'"
+          :disabled="hasActiveFilter"
+          @click="toggleSortMode"
+        >
           <VIcon icon="mdi-sort-variant" />
         </IconBtn>
       </div>
@@ -494,6 +535,15 @@ useNativePageHeader({
       </div>
     </VAlert>
 
+    <!-- 关键词过滤提示条：从资源搜索页「去配置 / 去更新」跳转而来时，明确当前列表是筛选结果 -->
+    <div v-if="queryFilter" class="site-query-filter mb-3" role="status">
+      <VIcon icon="mdi-filter-variant" size="16" aria-hidden="true" />
+      <span class="site-query-filter__text">{{ t('site.filteringBy', { q: queryFilter }) }}</span>
+      <VBtn size="x-small" variant="text" color="warning" class="site-query-filter__clear" @click="clearQueryFilter">
+        {{ t('site.clearFilter') }}
+      </VBtn>
+    </div>
+
     <LoadingBanner v-if="!isRefreshed && !loadError" class="mt-12" />
     <Draggable
       v-if="draggableSiteList.length > 0 && canDragSort"
@@ -506,6 +556,7 @@ useNativePageHeader({
     >
       <template #item="{ element }">
         <SiteCard
+          :class="{ 'site-card--query-match': normalizedQuery && matchesQueryFilter(element) }"
           :site="element"
           :data="siteUserDataMap[element.domain]"
           :stats="siteStatsList[element.domain] || {}"
@@ -526,6 +577,7 @@ useNativePageHeader({
     >
       <template #default="{ item }">
         <SiteCard
+          :class="{ 'site-card--query-match': normalizedQuery && matchesQueryFilter(item) }"
           :site="item"
           :data="siteUserDataMap[item.domain]"
           :stats="siteStatsList[item.domain] || {}"
@@ -552,8 +604,8 @@ useNativePageHeader({
   <NoDataFound
     v-if="draggableSiteList.length === 0 && isRefreshed"
     error-code="404"
-    :error-title="filterOption === 'all' ? t('site.noSites') : t('common.noMatchingData')"
-    :error-description="filterOption === 'all' ? t('site.sitesWillBeShownHere') : t('common.tryChangingFilters')"
+    :error-title="hasActiveFilter ? t('common.noMatchingData') : t('site.noSites')"
+    :error-description="hasActiveFilter ? t('common.tryChangingFilters') : t('site.sitesWillBeShownHere')"
   />
   <!-- 新增站点按钮 -->
   <Teleport to="body" v-if="route.path === '/site'">
@@ -592,3 +644,42 @@ useNativePageHeader({
     </div>
   </Teleport>
 </template>
+
+<style scoped>
+/* 关键词过滤提示条：与警告条同一套 warning 语汇，避免被当成普通信息条忽略。 */
+.site-query-filter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px 6px 12px;
+  border: 1px solid rgba(var(--v-theme-warning), 0.26);
+  border-radius: 10px;
+  background: rgba(var(--v-theme-warning), 0.08);
+  color: rgba(var(--v-theme-on-surface), 0.72);
+  font-size: 12.5px;
+}
+
+.site-query-filter :deep(.v-icon) {
+  color: rgb(var(--v-theme-warning));
+}
+
+.site-query-filter__text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.site-query-filter__clear {
+  flex: 0 0 auto;
+  margin-inline-start: auto;
+}
+
+/* 命中高亮：只加外层描边 + 极淡底色，不改 SiteCard 内部结构。 */
+.site-card--query-match {
+  border-radius: 12px;
+  outline: 1px solid rgba(var(--v-theme-warning), 0.45);
+  outline-offset: 2px;
+  background: rgba(var(--v-theme-warning), 0.04);
+}
+</style>

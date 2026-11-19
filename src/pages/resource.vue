@@ -2,6 +2,7 @@
 import type { LocationQuery } from 'vue-router'
 import ResourceSearchEmptyState from '@/components/states/ResourceSearchEmptyState.vue'
 import SearchDiagnosticsPanel from '@/components/states/SearchDiagnosticsPanel.vue'
+import SiteErrorAlert from '@/components/search/SiteErrorAlert.vue'
 import { hasRuleConfigurationError, normalizeSearchDiagnostics } from '@/utils/searchDiagnostics'
 import api from '@/api'
 import type { Context, MediaDataSource, SearchDiagnostics, SearchSourcePage, SubtitleInfo } from '@/api/types'
@@ -21,7 +22,7 @@ import { usePWA } from '@/composables/usePWA'
 import { useToast } from 'vue-toastification'
 import { useKeepAliveRefresh } from '@/composables/useKeepAliveRefresh'
 import { useUserStore } from '@/stores'
-import { buildUserPermissionContext, hasPermission } from '@/utils/permission'
+import { PERMISSION_FEATURE, buildUserPermissionContext, hasFeaturePermission, hasPermission } from '@/utils/permission'
 import { SearchReplaceBatchCollector, isSearchReplaceBatchEvent } from '@/utils/searchStream'
 import { getCurrentLocale } from '@/plugins/i18n'
 import { isMediaDataSource, isValidMediaSourceId } from '@/utils/mediaId'
@@ -38,6 +39,14 @@ const { appMode } = usePWA()
 const userStore = useUserStore()
 const canSearch = computed(() =>
   hasPermission(buildUserPermissionContext(userStore.superUser, userStore.permissions), 'search'),
+)
+// 站点配置/更新入口需要 manage 权限；无权限用户只保留「重试」，避免点出权限弹窗。
+const canManageSites = computed(() =>
+  hasFeaturePermission(
+    buildUserPermissionContext(userStore.superUser, userStore.permissions),
+    PERMISSION_FEATURE.MANAGE_SITE,
+    'manage',
+  ),
 )
 
 // 提示框
@@ -464,8 +473,14 @@ let streamFlushTimer: ReturnType<typeof setTimeout> | null = null
 let streamFinalResultApplied = false
 const clientPagination = useSearchPagination()
 const searchPagination = clientPagination.state
-const searchErrorMessages = clientPagination.errorMessages
+// 警告条渲染用的结构化失败行：重试期间自动切到快照，避免闪一下消失。
+const failureRows = clientPagination.displayFailureRows
+const normalSiteCount = computed(() => clientPagination.state.value.sources.filter(source => !source.error).length)
 const loadingNextPage = ref(false)
+// 正在重试的来源：让警告条只给这几行加 spinner，其余行禁用动作。
+const retryingSources = ref<string[]>([])
+// 本次续页是否由警告条的「重试」触发：只有重试才把头部文案换成「正在重试」。
+const retryingFailures = ref(false)
 
 // 首次搜索结果条数；续页追加在其后，AI 推荐的索引只对应这部分。
 let firstPageResultCount: number | null = null
@@ -730,7 +745,9 @@ function buildSearchStreamUrl(params: SearchParams, requestToken?: string) {
 // 重置搜索结果
 function resetSearchResults() {
   searchDiagnostics.value = null
-  clientPagination.reset()
+  // 新搜索期间保留上一轮失败快照：警告条不闪一下消失（规格第 5 节「搜索中保留旧快照」）。
+  clientPagination.beginFailureRetry()
+  clientPagination.reset({ keepFailureSnapshot: true })
   firstPageResultCount = null
   loadingNextPage.value = false
   clearStreamPreviewState(true)
@@ -1039,11 +1056,23 @@ async function requestSearchResults(params: SearchParams, requestToken?: string)
   return result || []
 }
 
-// 每次点击快照各来源的指定页，失败原页重试，迟到响应由既有请求身份隔离。
-async function loadNextPage() {
-  if (loadingNextPage.value || progressActive.value || !searchPagination.value.can_continue) return
+/**
+ * 每次点击快照各来源的指定页，失败原页重试，迟到响应由既有请求身份隔离。
+ * options.targets：只重试这些来源（警告条单站点重试）；缺省则续页全部可续来源。
+ * options.retry：本次是「重试失败站点」而非普通续页，只有重试才计入重试次数/冷却。
+ */
+async function loadNextPage(options: { targets?: string[]; retry?: boolean } = {}) {
+  if (loadingNextPage.value || progressActive.value) return
   const requestId = activeSearchRequestId
-  const requests = [...clientPagination.requests.value]
+  const targets = options.targets?.length ? options.targets : null
+  const requests = targets
+    ? clientPagination.requests.value.filter(source => targets.includes(source.source))
+    : [...clientPagination.requests.value]
+  if (requests.length === 0) return
+  // 重试会清空 diagnostics 并覆盖 sources，警告条必须用快照渲染，否则会闪一下消失。
+  clientPagination.beginFailureRetry()
+  retryingSources.value = requests.map(source => source.source)
+  retryingFailures.value = Boolean(options.retry)
   loadingNextPage.value = true
   if (firstPageResultCount === null) firstPageResultCount = originalDataList.value.length
   // TODO: AI 推荐只基于首次搜索结果，续页不清空、不重新触发推荐；续页结果纳入推荐留待后续处理。
@@ -1058,6 +1087,7 @@ async function loadNextPage() {
       url.searchParams.set('page', String(source.nextPage))
       url.searchParams.set('source', source.source)
       continuingSource = source
+      if (options.retry) clientPagination.beginSourceRetry(source.source)
       searchDiagnostics.value = null
       try {
         await searchByStream(params, undefined, url.toString())
@@ -1065,14 +1095,34 @@ async function loadNextPage() {
         if (requestId !== activeSearchRequestId) return
         const message = error instanceof Error ? error.message : t('common.error')
         clientPagination.failSource(source, message)
+        // 重试失败后进入冷却，避免用户对着同一个坏站点连点。
+        if (options.retry) clientPagination.coolDownSource(source.source)
         toast.error(message)
       } finally {
         continuingSource = null
       }
     }
   } finally {
-    if (requestId === activeSearchRequestId) loadingNextPage.value = false
+    retryingSources.value = []
+    retryingFailures.value = false
+    // 只有本次请求仍然有效时才释放快照：期间若已发起新搜索，快照归新搜索所有。
+    if (requestId === activeSearchRequestId) {
+      loadingNextPage.value = false
+      clientPagination.endFailureRetry()
+    }
   }
+}
+
+/** 警告条批量/单站点重试：复用续页通道，按来源重试原页。 */
+function retryFailedSites(targets?: string[]) {
+  void loadNextPage({ targets, retry: true })
+}
+
+/** 去配置 / 去更新：跳转站点管理并按站点名过滤（无 manage 权限时不跳，避免权限弹窗）。 */
+function openSiteSettings(source: string) {
+  if (!canManageSites.value) return
+  const row = failureRows.value.find(item => item.source === source)
+  router.push({ path: '/site', query: { q: row?.siteName || source } })
 }
 
 // 按流搜索
@@ -1241,6 +1291,9 @@ async function fetchData(options: { force?: boolean; params?: SearchParams; sile
     stopLoadingProgress()
     isRefreshed.value = true
     return Promise.reject(error)
+  } finally {
+    // 搜索结束后释放失败快照，回到实时派生（新失败行会替换旧快照）。
+    if (requestId === activeSearchRequestId) clientPagination.endFailureRetry()
   }
 }
 
@@ -1660,7 +1713,7 @@ useNativePageHeader({
       show: showResultHeader.value && searchPagination.value.can_continue,
       loading: loadingNextPage.value,
       disabled: progressActive.value || isRefreshing.value,
-      action: loadNextPage,
+      action: () => loadNextPage(),
     },
     {
       title: t('resource.aiRecommend'),
@@ -1797,7 +1850,7 @@ useNativePageHeader({
           :aria-label="t('resource.loadNextPage')"
           :loading="loadingNextPage"
           :disabled="progressActive || isRefreshing || loadingNextPage"
-          @click="loadNextPage"
+          @click="loadNextPage()"
         >
           <VIcon icon="mdi-page-next-outline" />
           <VTooltip activator="parent" location="top">
@@ -1843,9 +1896,22 @@ useNativePageHeader({
       </div>
     </div>
 
-    <VAlert v-if="searchErrorMessages.length" type="warning" variant="tonal" density="compact" class="my-3">
-      {{ searchErrorMessages.join('；') }}
-    </VAlert>
+    <Transition name="site-error-alert">
+      <SiteErrorAlert
+        v-if="failureRows.length"
+        :rows="failureRows"
+        :retrying="retryingFailures"
+        :busy="progressActive || isRefreshing || loadingNextPage"
+        :retrying-sources="retryingSources"
+        :normal-count="normalSiteCount"
+        :total-count="displayResourceCount"
+        :can-manage-sites="canManageSites"
+        @retry-all="retryFailedSites()"
+        @retry-one="retryFailedSites([$event])"
+        @configure="openSiteSettings"
+        @update="openSiteSettings"
+      />
+    </Transition>
 
     <SearchDiagnosticsPanel
       v-if="isRefreshed && !progressActive && !loadingNextPage && !isSubtitleSearch && searchDiagnostics"
@@ -2105,7 +2171,7 @@ useNativePageHeader({
         :loading="loadingNextPage"
         :disabled="progressActive || isRefreshing || loadingNextPage"
         prepend-icon="mdi-page-next-outline"
-        @click="loadNextPage"
+        @click="loadNextPage()"
       >
         {{ t('resource.loadNextPage') }}
       </VBtn>
@@ -2131,6 +2197,34 @@ useNativePageHeader({
 </template>
 
 <style scoped>
+/* 站点错误警告条出现/消失：只做 max-height + opacity，不 translateY（不推挤结果列表）。 */
+.site-error-alert-enter-active,
+.site-error-alert-leave-active {
+  overflow: hidden;
+  transition:
+    max-height 180ms ease-out,
+    opacity 180ms ease-out;
+}
+
+.site-error-alert-enter-from,
+.site-error-alert-leave-to {
+  max-height: 0;
+  opacity: 0;
+}
+
+.site-error-alert-enter-to,
+.site-error-alert-leave-from {
+  max-height: 420px;
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .site-error-alert-enter-active,
+  .site-error-alert-leave-active {
+    transition: opacity 160ms ease-out;
+  }
+}
+
 .search-loading-state {
   display: flex;
   flex-direction: column;
