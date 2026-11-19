@@ -27,7 +27,14 @@ const props = defineProps({
   width: String,
   height: String,
   targetMusicType: String,
+  // 由页面统一持有的筛选状态；卡片只读取选中态，不缓存自己的副本
+  filterForm: Object as PropType<Record<string, string[]>>,
 })
+
+const emit = defineEmits<{
+  'toggle-filter': [key: string, value: string]
+}>()
+
 const globalSettingsStore = useGlobalSettingsStore()
 
 // 种子信息
@@ -104,6 +111,77 @@ function openTorrentDetail(item: Context | null = null) {
 /** 为已确认的促销选择样式，未知倍率不落入免费颜色。 */
 function getPromotionClass(kind?: TorrentPromotionKind) {
   return kind ? { free: 'bg-success', discount: 'bg-orange', bonus: 'bg-purple', other: '' }[kind] : ''
+}
+
+/** 只有站点明确标注的字幕能作为筛选入口，其余标签保持静态。 */
+const clickableSubtitleLabels = new Set(['中字', '特效'])
+
+interface FilterTag {
+  key: string
+  value: string
+  dimension: string
+  className: string
+  selected: boolean
+}
+
+/** 白名单按来源字段/class 判定，不按文案猜测；同值重复只保留第一个可点入口。 */
+function createFilterTag(key: string, value: string | undefined, dimension: string, className: string): FilterTag | null {
+  if (!value) return null
+  return {
+    key,
+    value,
+    dimension,
+    className,
+    selected: Boolean(props.filterForm?.[key]?.includes(value)),
+  }
+}
+
+const metaFilterTags = computed(() =>
+  [
+    createFilterTag('webSource', meta.value?.web_source, '流媒体', 'chip-web-source'),
+    createFilterTag('edition', meta.value?.edition, '版本', 'chip-edition'),
+    createFilterTag('resolution', meta.value?.resource_pix, '分辨率', 'chip-resolution'),
+    createFilterTag('videoCode', meta.value?.video_encode, '编码', 'chip-codec'),
+    createFilterTag('releaseGroup', meta.value?.resource_team, '制作组', 'chip-team'),
+  ].filter((tag): tag is FilterTag => tag !== null),
+)
+
+const labelFilterTags = computed(() => {
+  const seen = new Set<string>()
+  return (torrent.value?.labels ?? []).map(label => {
+    const eligible = clickableSubtitleLabels.has(label)
+    const isFirst = eligible && !seen.has(label)
+    if (eligible) seen.add(label)
+    return {
+      label,
+      tag: isFirst ? createFilterTag('subtitle', label, '字幕', 'chip-label') : null,
+    }
+  })
+})
+
+function filterTagAttrs(tag: FilterTag | null) {
+  if (!tag) return {}
+  return {
+    role: 'checkbox',
+    'aria-checked': tag.selected,
+    'aria-label': `按${tag.dimension} ${tag.value} 筛选`,
+    tabindex: 0,
+  }
+}
+
+function filterTagClasses(tag: FilterTag | null) {
+  return tag ? ['filter-tag-chip', tag.selected ? 'filter-tag-chip--selected' : ''] : []
+}
+
+/** 卡片不拥有筛选状态，只把原串交给页面由 handleFilterFormUpdate 统一处理。 */
+function toggleFilterTag(tag: FilterTag | null) {
+  if (tag) emit('toggle-filter', tag.key, tag.value)
+}
+
+/** VChip 会把 Enter/Space 转成一次 click，键盘路径改由 keydown 独占，避免双触发。 */
+function handleTagClick(tag: FilterTag | null, event?: Event) {
+  if (event instanceof KeyboardEvent) return
+  toggleFilterTag(tag)
 }
 
 // 打开更多来源对话框
@@ -226,45 +304,47 @@ watch(
           <span class="text-sm text-medium-emphasis">{{ formatDateDifference(torrent.pubdate) }}</span>
         </div>
 
-        <!-- 资源标签区 -->
-        <div class="d-flex flex-wrap gap-1 mb-2">
-          <!-- 流媒体平台 -->
-          <VChip v-if="meta?.web_source" class="chip-web-source rounded-sm" size="x-small" variant="elevated">
-            {{ meta?.web_source }}
-          </VChip>
-
-          <!-- 版本标签 -->
-          <VChip v-if="meta?.edition" class="chip-edition rounded-sm" size="x-small" variant="elevated">
-            {{ meta?.edition }}
-          </VChip>
-
-          <!-- 分辨率标签 -->
-          <VChip v-if="meta?.resource_pix" class="chip-resolution rounded-sm" size="x-small" variant="elevated">
-            {{ meta?.resource_pix }}
-          </VChip>
-
-          <!-- 编码标签 -->
-          <VChip v-if="meta?.video_encode" class="chip-codec rounded-sm" size="x-small" variant="elevated">
-            {{ meta?.video_encode }}
-          </VChip>
-
-          <!-- 制作组标签 -->
-          <VChip v-if="meta?.resource_team" class="chip-team rounded-sm" size="x-small" variant="elevated">
-            {{ meta?.resource_team }}
-          </VChip>
-
-          <!-- 其他标签 -->
+        <!-- 资源标签区：白名单标签可点击筛选，其余保持静态 -->
+        <div class="d-flex flex-wrap gap-1 mb-2 card-filter-tags">
           <VChip
-            v-for="(label, index) in torrent?.labels"
-            :key="index"
-            class="chip-label rounded-sm"
+            v-for="tag in metaFilterTags"
+            :key="tag.key"
+            :class="[tag.className, 'rounded-sm', ...filterTagClasses(tag)]"
             size="x-small"
             variant="elevated"
+            v-bind="filterTagAttrs(tag)"
+            @click.stop="handleTagClick(tag, $event)"
+            @keydown.enter.space.stop.prevent="toggleFilterTag(tag)"
           >
-            {{ label }}
+            <span class="filter-tag-label">{{ tag.value }}</span>
+            <span class="filter-tag-slot" aria-hidden="true">
+              <svg class="filter-tag-funnel" viewBox="0 0 24 24"><path d="M3,4H21L14,12V19L10,21V12L3,4Z" /></svg>
+              <svg class="filter-tag-check" viewBox="0 0 24 24"><path d="M9,16.17L4.83,12L3.41,13.41L9,19L21,7L19.59,5.59L9,16.17Z" /></svg>
+            </span>
           </VChip>
 
-          <!-- 特殊标签 -->
+          <!-- 其他标签：仅「中字」「特效」按字幕维度可筛选，且同值只第一个可点 -->
+          <VChip
+            v-for="(entry, index) in labelFilterTags"
+            :key="`label-${index}`"
+            :class="['chip-label', 'rounded-sm', ...filterTagClasses(entry.tag)]"
+            size="x-small"
+            variant="elevated"
+            v-bind="filterTagAttrs(entry.tag)"
+            @click.stop="handleTagClick(entry.tag, $event)"
+            @keydown.enter.space.stop.prevent="toggleFilterTag(entry.tag)"
+          >
+            <template v-if="entry.tag">
+              <span class="filter-tag-label">{{ entry.label }}</span>
+              <span class="filter-tag-slot" aria-hidden="true">
+                <svg class="filter-tag-funnel" viewBox="0 0 24 24"><path d="M3,4H21L14,12V19L10,21V12L3,4Z" /></svg>
+                <svg class="filter-tag-check" viewBox="0 0 24 24"><path d="M9,16.17L4.83,12L3.41,13.41L9,19L21,7L19.59,5.59L9,16.17Z" /></svg>
+              </span>
+            </template>
+            <template v-else>{{ entry.label }}</template>
+          </VChip>
+
+          <!-- 特殊标签保持静态 -->
           <VChip v-if="torrent?.hit_and_run" class="chip-hr rounded-sm" size="x-small" variant="elevated">H&R</VChip>
           <VChip v-if="torrent?.freedate_diff" class="chip-expire rounded-sm" size="x-small" variant="elevated">
             {{ torrent?.freedate_diff }}
@@ -401,5 +481,102 @@ watch(
 .chip-bonus {
   background-color: #9c27b0;
   color: white;
+}
+
+/* ===== 卡片标签筛选：保留分类色底，只叠加主色双环与常驻槽位 ===== */
+.card-filter-tags > .v-chip:not(.filter-tag-chip) {
+  pointer-events: none;
+}
+
+.filter-tag-chip {
+  position: relative;
+  cursor: pointer;
+  transition: box-shadow 180ms ease-out, filter 180ms ease-out;
+}
+
+.filter-tag-chip:hover {
+  filter: brightness(1.1);
+  box-shadow: 0 0 0 2px rgba(var(--v-theme-primary), 0.18);
+}
+
+.filter-tag-chip:focus-visible {
+  outline: 2px solid rgb(var(--v-theme-primary));
+  outline-offset: 2px;
+}
+
+.filter-tag-chip--selected,
+.filter-tag-chip--selected:hover {
+  font-weight: 600 !important;
+  box-shadow: 0 0 0 2px rgb(var(--v-theme-surface)), 0 0 0 4px rgb(var(--v-theme-primary)) !important;
+}
+
+.filter-tag-chip--selected:focus-visible {
+  outline-offset: 6px;
+}
+
+.filter-tag-label {
+  pointer-events: none;
+}
+
+.filter-tag-slot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  inline-size: 14px;
+  block-size: 14px;
+  margin-inline-start: 3px;
+  border-radius: 50%;
+}
+
+.filter-tag-funnel,
+.filter-tag-check {
+  inline-size: 10px;
+  block-size: 10px;
+  fill: rgb(var(--v-theme-on-primary));
+}
+
+.filter-tag-funnel {
+  opacity: 0.55;
+  transition: opacity 180ms ease-out;
+}
+
+.filter-tag-chip:hover .filter-tag-funnel {
+  opacity: 0.9;
+}
+
+.filter-tag-check {
+  display: none;
+}
+
+.filter-tag-chip--selected .filter-tag-slot {
+  background: rgb(var(--v-theme-primary));
+}
+
+.filter-tag-chip--selected .filter-tag-funnel {
+  display: none;
+}
+
+.filter-tag-chip--selected .filter-tag-check {
+  display: block;
+}
+
+@media (width <= 600px) {
+  .card-filter-tags {
+    gap: 12px 8px;
+  }
+
+  .filter-tag-chip::before {
+    content: '';
+    position: absolute;
+    inset: -6px 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .filter-tag-chip,
+  .filter-tag-funnel {
+    transition: none;
+  }
 }
 </style>

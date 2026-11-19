@@ -97,10 +97,14 @@ function createContext(overrides: ContextOverrides = {}): Context {
   }
 }
 
-async function renderCard(context: Context, more: Context[] = []) {
+async function renderCard(
+  context: Context,
+  more: Context[] = [],
+  filterForm?: Record<string, string[]>,
+) {
   return renderWithProviders(TorrentCard, {
     global: { stubs: { VImg: ImageStub } },
-    props: { more, torrent: context },
+    props: { more, torrent: context, ...(filterForm ? { filterForm } : {}) },
   })
 }
 
@@ -382,6 +386,74 @@ describe('TorrentCard display and interactions', () => {
     await fireEvent.click(getDetailButton(container))
 
     expect(open).toHaveBeenCalledWith(context.torrent_info.page_url, '_blank')
+    expect(mocks.openSharedDialog).not.toHaveBeenCalled()
+  })
+})
+
+describe('TorrentCard clickable filter tags', () => {
+  beforeEach(() => {
+    Object.keys(downloadedTorrentMap).forEach(url => delete downloadedTorrentMap[url])
+    mocks.getCachedSiteIcon.mockResolvedValue('https://images.example.com/site-101.png')
+    mocks.openSharedDialog.mockReturnValue({ close: vi.fn(), id: 1, updateProps: vi.fn() })
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+  })
+
+  function createFilterContext() {
+    return createContext({
+      meta: {
+        web_source: 'Disney+',
+        edition: 'WEB-DL HDR',
+        resource_pix: '2160p',
+        video_encode: 'H265',
+        resource_team: 'CMCTV',
+      },
+      torrent: { labels: ['中字', '官方', '中字', '特效'] },
+    })
+  }
+
+  it('emits original values for whitelisted tags without starting a download', async () => {
+    const { emitted } = await renderCard(createFilterContext())
+
+    await fireEvent.click(screen.getByLabelText('按版本 WEB-DL HDR 筛选'))
+    await fireEvent.click(screen.getByLabelText('按制作组 CMCTV 筛选'))
+    await fireEvent.click(screen.getByLabelText('按字幕 中字 筛选'))
+
+    expect(emitted()['toggle-filter']).toEqual([
+      ['edition', 'WEB-DL HDR'],
+      ['releaseGroup', 'CMCTV'],
+      ['subtitle', '中字'],
+    ])
+    expect(mocks.openSharedDialog).not.toHaveBeenCalled()
+  })
+
+  it('derives checked state from the shared filter form and keeps duplicate values in sync', async () => {
+    const { container, emitted } = await renderCard(createFilterContext(), [], {
+      edition: ['WEB-DL HDR'],
+      resolution: ['2160p'],
+      subtitle: ['中字'],
+    })
+
+    expect(screen.getByLabelText('按版本 WEB-DL HDR 筛选')).toHaveAttribute('aria-checked', 'true')
+    expect(screen.getByLabelText('按分辨率 2160p 筛选')).toHaveAttribute('aria-checked', 'true')
+    expect(container.querySelectorAll('.filter-tag-chip--selected')).toHaveLength(3)
+    expect(screen.getAllByLabelText('按字幕 中字 筛选')).toHaveLength(1)
+    expect(screen.queryByLabelText('按字幕 官方 筛选')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('按流媒体 测试站 筛选')).not.toBeInTheDocument()
+
+    await fireEvent.click(screen.getByLabelText('按分辨率 2160p 筛选'))
+    expect(emitted()['toggle-filter']).toEqual([['resolution', '2160p']])
+  })
+
+  it('toggles from the keyboard without bubbling to the card download handler', async () => {
+    const { emitted } = await renderCard(createFilterContext())
+
+    await fireEvent.keyDown(screen.getByLabelText('按字幕 特效 筛选'), { key: 'Enter' })
+    await fireEvent.keyDown(screen.getByLabelText('按流媒体 Disney+ 筛选'), { key: ' ' })
+
+    expect(emitted()['toggle-filter']).toEqual([
+      ['subtitle', '特效'],
+      ['webSource', 'Disney+'],
+    ])
     expect(mocks.openSharedDialog).not.toHaveBeenCalled()
   })
 })

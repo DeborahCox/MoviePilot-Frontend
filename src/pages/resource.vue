@@ -533,6 +533,13 @@ function handleFilterFormUpdate(key: string, values: string[]) {
   torrentFilter.filterForm[key] = values
 }
 
+/** 卡片标签是筛选表单的另一种入口：toggle 后仍由 handleFilterFormUpdate 单一写入。 */
+function handleCardToggleFilter(key: string, value: string) {
+  const values = torrentFilter.filterForm[key] ?? []
+  const nextValues = values.includes(value) ? values.filter(item => item !== value) : [...values, value]
+  handleFilterFormUpdate(key, nextValues)
+}
+
 // 处理全选
 function handleSelectAll(key: string) {
   torrentFilter.selectAll(key)
@@ -1986,7 +1993,9 @@ useNativePageHeader({
                 v-for="(item, index) in streamPreviewDataList"
                 :key="getTorrentItemKey(item, index)"
                 :torrent="item"
+                :filter-form="torrentFilter.filterForm"
                 class="stream-result-item"
+                @toggle-filter="handleCardToggleFilter"
               />
             </div>
             <ProgressiveCardGrid
@@ -1997,7 +2006,13 @@ useNativePageHeader({
               :estimated-item-height="400"
             >
               <template #default="{ item }">
-                <TorrentCard :torrent="item" :more="item.more" :target-music-type="activeSearchParams.music_type" />
+                <TorrentCard
+                  :torrent="item"
+                  :more="item.more"
+                  :target-music-type="activeSearchParams.music_type"
+                  :filter-form="torrentFilter.filterForm"
+                  @toggle-filter="handleCardToggleFilter"
+                />
               </template>
             </ProgressiveCardGrid>
           </div>
