@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { screen } from '@testing-library/vue'
+import { fireEvent, screen } from '@testing-library/vue'
 import { renderWithProviders } from '@tests/support/render'
 import TorrentSingleFilterDialog from '../TorrentSingleFilterDialog.vue'
 import { NativeSheetAdapter } from '@/native/sheet'
@@ -26,5 +26,44 @@ describe('单项资源过滤的原生半屏关闭契约', () => {
     expect(adapter.execute('presentation.dismiss', { id: sheet.id })).toBe(true)
     expect(result.emitted()['update:modelValue']).toEqual([[false]])
     expect(result.emitted().close).toEqual([[]])
+  })
+
+  it('uses the same conservative edition grouping with exact original chip values', async () => {
+    const editionOptions = [
+      '全网',
+      'BluRay HDR',
+      'UHD BluRay HDR',
+      'UHD BluRay',
+      'BluRay',
+      'UHD BluRay REMUX',
+      'WEB-DL DoVi',
+      'WEB-DL HDR',
+      'WEB-DL',
+      'BluRay REMUX',
+      'HDR10 DoVi',
+      'UHD BluRay REMUX DV',
+      'WEB-DL HDR10+',
+      'WEB',
+    ]
+    const result = await renderWithProviders(TorrentSingleFilterDialog, {
+      global: { components: { VDialogCloseBtn: DialogCloseBtn } },
+      props: {
+        filterForm: { edition: [] },
+        filterKey: 'edition',
+        filterTitle: '质量',
+        filterOptions: { edition: editionOptions },
+      },
+    })
+
+    expect(await screen.findByText('其他·未识别')).toBeVisible()
+    expect(document.querySelector('.edition-counter')?.textContent?.replace(/\s+/g, ' ').trim()).toBe('已选 0 / 共 14')
+    const chips = Array.from(document.querySelectorAll<HTMLElement>('[data-testid="edition-chip"]'))
+    expect(chips.length).toBeGreaterThan(12)
+    expect(chips.every(chip => editionOptions.includes(chip.dataset.value ?? ''))).toBe(true)
+
+    const selection = chips.find(chip => chip.dataset.value === 'WEB-DL HDR10+')
+    expect(selection).toBeDefined()
+    await fireEvent.click(selection as HTMLElement)
+    expect(result.emitted()['update:filterForm']).toEqual([['edition', ['WEB-DL HDR10+']]])
   })
 })

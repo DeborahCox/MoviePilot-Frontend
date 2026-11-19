@@ -1,7 +1,7 @@
 import TorrentFilterBar from '@/components/filter/TorrentFilterBar.vue'
 import { fireEvent, screen } from '@testing-library/vue'
 import { renderWithProviders } from '@tests/support/render'
-import { defineComponent } from 'vue'
+import { defineComponent, h } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
@@ -43,6 +43,24 @@ const ChipStub = defineComponent({
   emits: ['click:close'],
   template:
     '<span><slot /><button v-if="closable" type="button" aria-label="移除筛选" @click="$emit(\'click:close\')" /></span>',
+})
+
+/** 分组 chip 使用原生 button 语义，替身负责把点击与 data-* 原样透传。 */
+const TieredChipStub = defineComponent({
+  inheritAttrs: false,
+  emits: ['click'],
+  setup(_props, { attrs, emit, slots }) {
+    return () =>
+      h(
+        'button',
+        {
+          type: 'button',
+          ...attrs,
+          onClick: (event: MouseEvent) => emit('click', event),
+        },
+        slots.default?.(),
+      )
+  },
 })
 
 const componentStubs = {
@@ -249,5 +267,96 @@ describe('TorrentFilterBar', () => {
 
     expect(mocks.openSharedDialog).toHaveBeenCalledTimes(4)
     result.unmount()
+  })
+})
+
+describe('TorrentFilterBar tiered edition panel', () => {
+  const editionOptions = [
+    '全网',
+    'BluRay HDR',
+    'UHD BluRay HDR',
+    'UHD BluRay',
+    'BluRay',
+    'UHD BluRay REMUX',
+    'WEB-DL DoVi',
+    'WEB-DL HDR',
+    'WEB-DL',
+    'BluRay REMUX',
+    'HDR10 DoVi',
+    'UHD BluRay REMUX DV',
+    'WEB-DL HDR10+',
+    'WEB',
+  ]
+  const stubs = { ...componentStubs, VChip: TieredChipStub }
+
+  function propsFor(overrides: Record<string, unknown> = {}) {
+    return {
+      ...defaultProps,
+      filterForm: {
+        ...defaultProps.filterForm,
+        edition: ['UHD BluRay REMUX'],
+        releaseGroup: [],
+      },
+      filterOptions: {
+        ...defaultProps.filterOptions,
+        edition: editionOptions,
+        releaseGroup: Array.from({ length: 13 }, (_, index) => `Group ${index}`),
+      },
+      filterTitles: { ...defaultProps.filterTitles, releaseGroup: '制作组' },
+      ...overrides,
+    }
+  }
+
+  it('shows original edition strings in five ordered groups with exact selection counts', async () => {
+    const result = await renderWithProviders(TorrentFilterBar, { props: propsFor(), global: { stubs } })
+
+    expect(result.container.querySelectorAll('.edition-panel')).toHaveLength(1)
+    expect(
+      Array.from(result.container.querySelectorAll<HTMLElement>('[data-testid="edition-group-head"]')).map(
+        head => head.querySelector('.edition-group-name')?.textContent?.trim(),
+      ),
+    ).toEqual(['UHD蓝光', '蓝光', 'WEB-DL', 'WEB', '其他·未识别'])
+    expect(result.container.textContent).toMatch(/已选\s*1\s*\/\s*共\s*14/)
+
+    const chips = Array.from(result.container.querySelectorAll<HTMLElement>('[data-testid="edition-chip"]'))
+    expect(new Set(chips.map(chip => chip.dataset.value)).size).toBeGreaterThan(12)
+    expect(chips.some(chip => chip.dataset.value === 'UHD BluRay REMUX DV')).toBe(true)
+    expect(chips.find(chip => chip.dataset.value === 'UHD BluRay REMUX')).toHaveAttribute('aria-checked', 'true')
+    expect(
+      result.container.querySelector<HTMLElement>('[data-testid="edition-group-head"] .edition-group-badge')?.textContent?.trim(),
+    ).toBe('1')
+
+    result.unmount()
+  })
+
+  it('toggles one original string at a time and keeps a single manually opened group', async () => {
+    const { container, emitted } = await renderWithProviders(TorrentFilterBar, {
+      props: propsFor({
+        filterForm: { ...defaultProps.filterForm, edition: [], releaseGroup: [] },
+      }),
+      global: { stubs },
+    })
+
+    const bdHead = container.querySelector<HTMLElement>('[data-testid="edition-group-head"][data-group="bd"]')
+    const webdlHead = container.querySelector<HTMLElement>('[data-testid="edition-group-head"][data-group="webdl"]')
+    expect(bdHead).toHaveAttribute('aria-expanded', 'false')
+    await fireEvent.click(bdHead as HTMLElement)
+    expect(bdHead).toHaveAttribute('aria-expanded', 'true')
+    await fireEvent.click(webdlHead as HTMLElement)
+    expect(bdHead).toHaveAttribute('aria-expanded', 'false')
+    expect(webdlHead).toHaveAttribute('aria-expanded', 'true')
+
+    const chip = container.querySelector<HTMLElement>('[data-testid="edition-chip"][data-value="WEB-DL HDR"]')
+    expect(chip).not.toBeNull()
+    await fireEvent.click(chip as HTMLElement)
+    expect(emitted()['update:filterForm']).toEqual([['edition', ['WEB-DL HDR']]])
+  })
+
+  it('keeps other dimensions flat even when they have more than twelve options', async () => {
+    const { container } = await renderWithProviders(TorrentFilterBar, { props: propsFor(), global: { stubs } })
+
+    expect(container.querySelectorAll('.edition-panel')).toHaveLength(1)
+    expect(container.querySelectorAll('.filter-options')).toHaveLength(6)
+    expect(screen.getAllByTestId('filter-value-control')).toHaveLength(6)
   })
 })

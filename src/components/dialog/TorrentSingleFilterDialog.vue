@@ -1,5 +1,11 @@
 <script setup lang="ts">
+import { useId } from 'vue'
 import { useI18n } from 'vue-i18n'
+import {
+  groupEditionOptions,
+  QUICK_EDITION_VALUES,
+  type EditionGroup,
+} from '@/utils/editionGroup'
 
 const { t } = useI18n()
 
@@ -34,6 +40,55 @@ const visible = computed({
 
 const filterValues = computed(() => props.filterForm[props.filterKey] ?? [])
 const options = computed(() => props.filterOptions[props.filterKey] ?? [])
+
+// 与 PC 浮层共用同一套保守分组；只有版本维度且选项较多时启用。
+const isTieredEdition = computed(() => props.filterKey === 'edition' && options.value.length > 12)
+const editionPanelId = useId()
+const expandedEditionGroups = ref<Set<string>>(new Set())
+const editionScrollRef = ref<HTMLElement>()
+const editionFadeVisible = ref(true)
+
+/** 可见集合取并集，已选但不在联动选项中的原串仍可取消。 */
+const editionVisibleOptions = computed(() => [
+  ...new Set([...options.value, ...filterValues.value]),
+])
+const editionGroups = computed(() => groupEditionOptions(editionVisibleOptions.value))
+const quickEditionOptions = computed(() =>
+  QUICK_EDITION_VALUES.filter(option => editionVisibleOptions.value.includes(option)),
+)
+
+function isEditionGroupExpanded(group: EditionGroup) {
+  if (group.items.some(item => filterValues.value.includes(item))) return true
+  if (expandedEditionGroups.value.size === 0) return group.id === editionGroups.value[0]?.id
+  return expandedEditionGroups.value.has(group.id)
+}
+
+function toggleEditionGroup(id: string) {
+  const next = new Set(expandedEditionGroups.value)
+  if (next.has(id)) next.clear()
+  else {
+    next.clear()
+    next.add(id)
+  }
+  expandedEditionGroups.value = next
+  nextTick(() => updateEditionFade())
+}
+
+function updateEditionFade(event?: Event) {
+  const element = (event?.target as HTMLElement | undefined) ?? editionScrollRef.value
+  if (!element) return
+  editionFadeVisible.value = element.scrollTop + element.clientHeight < element.scrollHeight - 4
+}
+
+watch(editionGroups, () => nextTick(() => updateEditionFade()))
+
+function toggleEditionValue(value: string) {
+  updateFilter(
+    filterValues.value.includes(value)
+      ? filterValues.value.filter(item => item !== value)
+      : [...filterValues.value, value],
+  )
+}
 
 /** 为移动端单项筛选显示对应分类图标。 */
 function getFilterIcon(key: string) {
@@ -73,29 +128,140 @@ function updateFilter(values: string[]) {
       <VCardTitle class="py-3 d-flex align-center" data-native-dialog-header>
         <VIcon :icon="getFilterIcon(props.filterKey)" class="me-2"></VIcon>
         <span data-native-dialog-title>{{ props.filterTitle }}</span>
+        <template v-if="isTieredEdition">
+          <span class="edition-scope">全网</span>
+          <span class="edition-counter" aria-live="polite">
+            已选 <b>{{ filterValues.length }}</b> / 共 {{ editionVisibleOptions.length }}
+          </span>
+        </template>
         <VSpacer />
         <VBtn
           v-if="filterValues.length > 0"
           variant="text"
           size="small"
           color="error"
-          @click="emit('clearFilter', props.filterKey)"
+          @click.stop="emit('clearFilter', props.filterKey)"
         >
           {{ t('torrent.clear') }}
         </VBtn>
-        <VBtn class="me-10" variant="text" size="small" color="primary" @click="emit('selectAll', props.filterKey)">
+        <VBtn
+          class="me-10"
+          variant="text"
+          size="small"
+          color="primary"
+          @click.stop="emit('selectAll', props.filterKey)"
+        >
           {{ t('torrent.selectAll') }}
         </VBtn>
       </VCardTitle>
       <VDivider />
-      <VCardText>
-        <VChipGroup
-          :model-value="filterValues"
-          column
-          multiple
-          class="filter-options"
-          @update:model-value="updateFilter"
-        >
+      <VCardText :class="{ 'filter-menu-tiered': isTieredEdition }">
+        <div v-if="isTieredEdition" class="edition-panel" role="dialog" aria-label="质量筛选">
+          <div class="edition-quick">
+            <span class="edition-quick-label">常用</span>
+            <div class="edition-quick-scroll">
+              <VChip
+                v-for="option in quickEditionOptions"
+                :key="option"
+                :value="option"
+                filter
+                variant="elevated"
+                size="small"
+                class="edition-chip edition-chip--neutral edition-chip--quick"
+                :class="{ 'v-chip--selected': filterValues.includes(option) }"
+                role="checkbox"
+                :aria-checked="filterValues.includes(option)"
+                :aria-label="`按版本 ${option} 筛选`"
+                :data-value="option"
+                data-testid="edition-chip"
+                @click.stop="toggleEditionValue(option)"
+              >
+                <span class="edition-chip-label">{{ option }}</span>
+              </VChip>
+            </div>
+          </div>
+
+          <div class="edition-scroll-wrap">
+            <div ref="editionScrollRef" class="edition-scroll" @scroll.passive="updateEditionFade">
+              <div
+                v-for="group in editionGroups"
+                :key="group.id"
+                class="edition-group"
+                role="group"
+                :aria-label="`${group.name} 分组`"
+              >
+                <button
+                  type="button"
+                  class="edition-group-head"
+                  :aria-expanded="isEditionGroupExpanded(group)"
+                  :aria-controls="`${editionPanelId}-${group.id}`"
+                  :data-group="group.id"
+                  data-testid="edition-group-head"
+                  @click.stop="toggleEditionGroup(group.id)"
+                >
+                  <VIcon icon="mdi-chevron-right" size="x-small" class="edition-group-chev" />
+                  <span class="edition-group-name">{{ group.name }}</span>
+                  <span class="edition-group-picked">
+                    {{ group.items.filter(item => filterValues.includes(item)).slice(0, 2).join(' · ') }}
+                  </span>
+                  <span class="edition-group-spacer" />
+                  <span
+                    v-if="group.items.filter(item => filterValues.includes(item)).length > 0"
+                    class="edition-group-badge"
+                    :aria-label="`已选 ${group.items.filter(item => filterValues.includes(item)).length} 项`"
+                  >
+                    {{ group.items.filter(item => filterValues.includes(item)).length }}
+                  </span>
+                  <span
+                    v-if="group.id === 'other' && group.items.some(item => filterValues.includes(item))"
+                    class="edition-group-hint"
+                  >含未识别串</span>
+                </button>
+                <div
+                  :id="`${editionPanelId}-${group.id}`"
+                  class="edition-group-body"
+                  role="region"
+                  :aria-label="`${group.name} 选项`"
+                  :hidden="!isEditionGroupExpanded(group)"
+                >
+                  <VChip
+                    v-for="option in group.items"
+                    :key="option"
+                    :value="option"
+                    filter
+                    variant="elevated"
+                    size="small"
+                    class="edition-chip edition-chip--group"
+                    :class="{
+                      'edition-chip--unknown': group.id === 'other',
+                      'v-chip--selected': filterValues.includes(option),
+                    }"
+                    role="checkbox"
+                    :aria-checked="filterValues.includes(option)"
+                    :aria-label="`按版本 ${option} 筛选`"
+                    :data-value="option"
+                    data-testid="edition-chip"
+                    @click.stop="toggleEditionValue(option)"
+                  >
+                    <VIcon
+                      v-if="group.id === 'other'"
+                      icon="mdi-help-circle-outline"
+                      size="x-small"
+                      class="edition-chip-mark"
+                    />
+                    <span class="edition-chip-label">{{ option }}</span>
+                    <svg class="edition-chip-check" viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M9,16.17L4.83,12L3.41,13.41L9,19L21,7L19.59,5.59L9,16.17Z" />
+                    </svg>
+                  </VChip>
+                </div>
+              </div>
+            </div>
+            <div v-if="editionFadeVisible" class="edition-fade" aria-hidden="true" />
+          </div>
+        </div>
+
+        <VChipGroup v-else :model-value="filterValues" column multiple class="filter-options" @update:model-value="updateFilter">
           <VChip
             v-for="option in options"
             :key="option"
@@ -112,7 +278,7 @@ function updateFilter(values: string[]) {
       <VCardActions class="app-dialog-actions">
         <VSpacer />
         <VBtn color="primary" variant="flat" prepend-icon="mdi-check" class="px-5" @click="visible = false">
-          {{ t('torrent.confirm') }}
+          {{ t('torrent.confirm') }}<template v-if="isTieredEdition">（{{ filterValues.length }}）</template>
         </VBtn>
       </VCardActions>
     </VCard>
@@ -143,5 +309,311 @@ function updateFilter(values: string[]) {
   box-shadow: 0 2px 4px rgba(var(--v-theme-primary), 0.3);
   color: rgb(var(--v-theme-on-primary)) !important;
   font-weight: 600;
+}
+
+/* ===== 移动端版本分组清单：与 PC 共用原串 chip + 保守分组 ===== */
+.filter-menu-tiered {
+  padding: 0;
+  overflow: hidden;
+}
+
+.edition-panel {
+  color: rgb(var(--v-theme-on-surface));
+  font-size: 12px;
+}
+
+.edition-scope {
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: rgba(var(--v-theme-on-surface), 0.05);
+  color: rgba(var(--v-theme-on-surface), 0.4);
+  font-size: 11px;
+  font-weight: 400;
+  white-space: nowrap;
+}
+
+.edition-counter {
+  color: rgba(var(--v-theme-on-surface), 0.52);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.edition-counter b {
+  color: rgb(var(--v-theme-primary));
+  font-weight: 600;
+}
+
+.edition-quick {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-block-size: 44px;
+  padding: 6px 12px;
+  background: rgb(var(--v-theme-surface));
+  border-block-end: 1px solid rgba(var(--v-theme-on-surface), 0.08);
+}
+
+.edition-quick-label {
+  flex: 0 0 auto;
+  color: rgba(var(--v-theme-on-surface), 0.4);
+  font-size: 10px;
+}
+
+.edition-quick-scroll {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-inline-size: 0;
+  overflow-x: auto;
+  padding-block: 2px;
+  scrollbar-width: none;
+  -webkit-mask-image: linear-gradient(90deg, transparent, currentColor 16px, currentColor calc(100% - 16px), transparent);
+  mask-image: linear-gradient(90deg, transparent, currentColor 16px, currentColor calc(100% - 16px), transparent);
+}
+
+.edition-quick-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.edition-scroll-wrap {
+  position: relative;
+}
+
+.edition-scroll {
+  max-block-size: min(320px, 44vh);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 5px 0 8px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(var(--v-theme-primary), 0.38) transparent;
+}
+
+.edition-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+
+.edition-scroll::-webkit-scrollbar-thumb {
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: rgba(var(--v-theme-primary), 0.38);
+  background-clip: padding-box;
+}
+
+.edition-fade {
+  position: absolute;
+  inset-inline: 0;
+  inset-block-end: 0;
+  block-size: 20px;
+  pointer-events: none;
+  background: linear-gradient(to top, rgb(var(--v-theme-surface)), transparent);
+}
+
+.edition-group + .edition-group {
+  margin-block-start: 2px;
+}
+
+.edition-group-head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  inline-size: 100%;
+  min-block-size: 36px;
+  padding: 4px 12px;
+  border: 0;
+  background: rgb(var(--v-theme-surface));
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.edition-group-head:hover {
+  background: rgba(var(--v-theme-on-surface), 0.03);
+}
+
+.edition-group-chev {
+  flex: 0 0 auto;
+  color: rgba(var(--v-theme-on-surface), 0.4);
+  transition: transform 180ms ease-out;
+}
+
+.edition-group-head[aria-expanded='true'] .edition-group-chev {
+  transform: rotate(90deg);
+}
+
+.edition-group-name {
+  color: rgba(var(--v-theme-on-surface), 0.72);
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.edition-group-picked {
+  overflow: hidden;
+  color: rgb(var(--v-theme-primary));
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.edition-group-picked:empty {
+  display: none;
+}
+
+.edition-group-spacer {
+  flex: 1;
+  min-inline-size: 2px;
+}
+
+.edition-group-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-inline-size: 16px;
+  block-size: 16px;
+  padding-inline: 4px;
+  border-radius: 8px;
+  background: rgba(var(--v-theme-primary), 0.2);
+  color: rgb(var(--v-theme-primary));
+  font-size: 10px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.edition-group-hint {
+  color: rgba(var(--v-theme-on-surface), 0.4);
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.edition-group-body {
+  padding: 2px 12px 6px 28px;
+}
+
+.edition-chip {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  inline-size: 100%;
+  min-block-size: 28px;
+  margin: 0;
+  padding-inline: 8px;
+  border: 1px solid rgba(var(--v-theme-primary), 0.26);
+  background: rgba(var(--v-theme-primary), 0.1) !important;
+  color: rgb(var(--v-theme-primary)) !important;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.2;
+  text-align: left;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.edition-chip + .edition-chip {
+  margin-block-start: 12px;
+}
+
+.edition-chip:not(.edition-chip--quick)::before {
+  content: '';
+  position: absolute;
+  inset: -6px 0;
+}
+
+.edition-chip:hover {
+  background: rgba(var(--v-theme-primary), 0.17) !important;
+}
+
+.edition-chip--neutral {
+  border-color: rgba(var(--v-theme-on-surface), 0.14);
+  background: rgba(var(--v-theme-on-surface), 0.035) !important;
+  color: rgba(var(--v-theme-on-surface), 0.72) !important;
+}
+
+.edition-chip--neutral:hover {
+  background: rgba(var(--v-theme-on-surface), 0.07) !important;
+  color: rgb(var(--v-theme-on-surface)) !important;
+}
+
+.edition-chip--quick {
+  inline-size: auto;
+  flex: 0 0 auto;
+}
+
+.edition-chip--quick::before {
+  content: none;
+}
+
+.edition-chip--unknown {
+  border-style: dashed;
+  border-color: rgba(var(--v-theme-on-surface), 0.14);
+  background: transparent !important;
+  color: rgba(var(--v-theme-on-surface), 0.4) !important;
+}
+
+.edition-chip--unknown:hover {
+  background: rgba(var(--v-theme-on-surface), 0.07) !important;
+  color: rgba(var(--v-theme-on-surface), 0.72) !important;
+}
+
+.edition-chip-label {
+  flex: 1;
+  min-inline-size: 0;
+}
+
+.edition-chip-check {
+  display: none;
+  inline-size: 12px;
+  block-size: 12px;
+  fill: rgb(var(--v-theme-on-primary));
+  flex: 0 0 auto;
+}
+
+.edition-chip-mark {
+  flex: 0 0 auto;
+  opacity: 0.7;
+}
+
+.edition-chip.v-chip--selected {
+  border-color: transparent;
+  background: rgba(var(--v-theme-primary), 0.85) !important;
+  color: rgb(var(--v-theme-on-primary)) !important;
+  font-weight: 600;
+}
+
+.edition-chip.v-chip--selected .edition-chip-check,
+.edition-chip.v-chip--selected .edition-chip-mark {
+  display: block;
+  opacity: 0.9;
+}
+
+.edition-chip.v-chip--selected .edition-chip-mark {
+  color: rgb(var(--v-theme-on-primary));
+}
+
+.edition-chip:focus-visible,
+.edition-group-head:focus-visible {
+  outline: 2px solid rgb(var(--v-theme-primary));
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .edition-group-chev,
+  .edition-chip,
+  .edition-fade {
+    transition: none;
+  }
+
+  .edition-chip.v-chip--selected .edition-chip-check {
+    display: block;
+  }
 }
 </style>
