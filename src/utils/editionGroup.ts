@@ -104,7 +104,7 @@ export function groupEditionOptions(options: string[]): EditionGroup[] {
   const groups = new Map<EditionGroup['id'], string[]>(EDITION_GROUP_ORDER.map(id => [id, []]))
   const seen = new Set<string>()
 
-  options.forEach((value, index) => {
+  options.forEach(value => {
     if (seen.has(value)) return
     seen.add(value)
     groups.get(detectMedium(value))?.push(value)
