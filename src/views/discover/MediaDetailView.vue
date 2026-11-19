@@ -2,6 +2,8 @@
 import { getSharedConfiguration } from '@/api/configuration'
 import { hasFeaturePermission, PERMISSION_FEATURE } from '@/utils/permission'
 import { getMediaStatus, getMediaSubscribedSeasons } from '@/api/mediaStatus'
+import { listMediaServerClients } from '@/api/mediaServer'
+import type { MediaServerClient } from '@/api/types'
 import { getSharedData, invalidateSharedData } from '@/utils/sharedDataCache'
 import { useToast } from 'vue-toastification'
 import { nativeChromeActive } from '@/native/layout'
@@ -109,6 +111,41 @@ async function querySharedTmdbMapping() {
 // 本地是否存在，存在则包括Item信息
 const existsItemId = ref('')
 const existsServer = ref('')
+
+// 已启用的媒体服务器名称与类型，用于判断入库条目是否落在 Plex 上
+const mediaServerClients = ref<MediaServerClient[]>([])
+
+async function loadMediaServerClients() {
+  if (mediaServerClients.value.length) return
+  try {
+    mediaServerClients.value = await listMediaServerClients()
+  } catch (error) {
+    console.error(error)
+  }
+}
+
+// 仅当入库条目所在的媒体服务器是 Plex 时，才展示 Plex 来源图标
+const plexItemExists = computed(() => {
+  if (!existsItemId.value) return false
+  const clients = mediaServerClients.value
+  if (!clients.length) return false
+  if (existsServer.value) {
+    const client = clients.find(item => item.name === existsServer.value)
+    return client?.type === 'plex'
+  }
+  // 后端未回传服务器名时，只有唯一 Plex 实例才能确定归属
+  return clients.filter(item => item.type === 'plex').length === 1
+})
+
+// 点击 Plex 图标：电影直接打开播放页，电视剧先选集
+function handlePlexSourceClick() {
+  if (!existsItemId.value) return
+  if (mediaDetail.value.type === '电视剧') {
+    void openPlayEpisodePicker()
+    return
+  }
+  void playMediaServerItem(existsItemId.value, mediaDetail.value.title || '', undefined, undefined, existsServer.value)
+}
 
 // 详情与媒体库状态是异步加载的，按当前可用操作数固定辅助按钮列数，避免初始化视口变化导致换行。
 const hasSubscribeAction = computed(
@@ -361,6 +398,8 @@ async function checkExists() {
     if (result.legacyFailures?.exists) throw new Error(result.legacyFailures.exists)
     existsItemId.value = result.item_id || ''
     existsServer.value = result.server || ''
+    // 已入库才需要知道媒体服务器类型，用于展示 Plex 来源图标
+    if (existsItemId.value) void loadMediaServerClients()
   } catch (error) {
     console.error(error)
   }
@@ -658,6 +697,31 @@ function getBangumiLink() {
 // 拼装 AniList 地址
 function getAniListLink() {
   return `https://anilist.co/anime/${mediaDetail.value.anilist_id}`
+}
+
+// 用于无站点 ID 的数据源（Trakt/Simkl/Letterboxd）做标题检索
+const searchSourceTitle = computed(() => mediaDetail.value.original_title || mediaDetail.value.title || '')
+
+// 拼装豆瓣网页地址，图标外链直达条目页
+function getDoubanLink() {
+  return `https://movie.douban.com/subject/${mediaDetail.value.douban_id}/`
+}
+
+// 拼装 Trakt 地址：有 IMDb ID 时直达条目，否则回退标题检索
+function getTraktLink() {
+  const imdbId = mediaDetail.value.imdb_id
+  if (imdbId) return `https://trakt.tv/search/imdb/${imdbId}`
+  return `https://trakt.tv/search?query=${encodeURIComponent(searchSourceTitle.value)}`
+}
+
+// 拼装 Simkl 地址（无站点 ID 字段，使用标题检索）
+function getSimklLink() {
+  return `https://simkl.com/search/?q=${encodeURIComponent(searchSourceTitle.value)}`
+}
+
+// 拼装 Letterboxd 地址（无 slug 字段，使用标题检索）
+function getLetterboxdLink() {
+  return `https://letterboxd.com/search/${encodeURIComponent(searchSourceTitle.value)}/`
 }
 
 // 拼装集图片地址
@@ -1263,7 +1327,7 @@ useNativePageHeader({
               <a class="crew-name" :href="`${director.url}`" target="_blank">{{ director.name }}</a>
             </li>
           </ul>
-          <div class="mt-6">
+          <div class="mt-6" data-testid="media-source-links">
             <a
               v-if="mediaDetail.tmdb_id || sharedTmdbMapping"
               class="mb-2 mr-2 inline-flex last:mr-0"
@@ -1594,34 +1658,99 @@ useNativePageHeader({
                 </span>
               </div>
             </div>
-            <div class="media-facts-sources" role="img" :aria-label="t('media.info.dataSource')">
-              <span class="media-fact-source logo-tmdb" role="img" aria-label="The Movie Database">
+            <div
+              class="media-facts-sources"
+              data-testid="media-facts-sources"
+              role="group"
+              :aria-label="t('media.info.dataSource')"
+            >
+              <button
+                v-if="plexItemExists"
+                type="button"
+                class="media-fact-source logo-plex"
+                aria-label="Plex"
+                title="Plex"
+                @click="handlePlexSourceClick"
+              >
+                <span class="logo-plex-word" aria-hidden="true">ple<span class="logo-plex-x">x</span></span>
+              </button>
+              <a
+                v-if="mediaDetail.tmdb_id || sharedTmdbMapping"
+                class="media-fact-source logo-tmdb"
+                :href="getTheMovieDbLink()"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="The Movie Database"
+                title="The Movie Database"
+              >
                 <span>THE MOVIE</span>
                 <span class="logo-tmdb-pill" aria-hidden="true" />
                 <span>DATABASE</span>
-              </span>
-              <span class="media-fact-source" role="img" aria-label="IMDb">
-                <span class="rating-badge-imdb rating-badge-imdb-sm" aria-hidden="true">IMDb</span>
-              </span>
-              <span class="media-fact-source" role="img" aria-label="Red Circle">
-                <svg class="logo-red-circle" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
-                  <circle cx="16" cy="16" r="14" fill="none" stroke="#7F1D26" stroke-width="2" />
-                  <circle cx="16" cy="16" r="10.5" fill="none" stroke="#7F1D26" stroke-width="1" />
+              </a>
+              <a
+                v-if="mediaDetail.imdb_id"
+                class="media-fact-source logo-badge logo-imdb"
+                :href="getImdbLink()"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="IMDb"
+                title="IMDb"
+              >
+                IMDb
+              </a>
+              <a
+                class="media-fact-source logo-trakt"
+                :href="getTraktLink()"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Trakt"
+                title="Trakt"
+              >
+                <svg viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+                  <circle cx="16" cy="16" r="14" fill="none" stroke="currentColor" stroke-width="2" />
+                  <circle cx="16" cy="16" r="10.5" fill="none" stroke="currentColor" stroke-width="1" />
                   <path
                     d="M9 23L16 8L23 23M12 17H20"
                     fill="none"
-                    stroke="#9E2630"
+                    stroke="currentColor"
                     stroke-width="2.6"
                     stroke-linejoin="round"
                   />
                 </svg>
-              </span>
-              <span class="media-fact-source logo-s" role="img" aria-label="S">S</span>
-              <span class="media-fact-source logo-letterboxd" role="img" aria-label="Letterboxd">
+              </a>
+              <a
+                class="media-fact-source logo-simkl"
+                :href="getSimklLink()"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Simkl"
+                title="Simkl"
+              >
+                <span aria-hidden="true">S</span>
+              </a>
+              <a
+                class="media-fact-source logo-letterboxd"
+                :href="getLetterboxdLink()"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Letterboxd"
+                title="Letterboxd"
+              >
                 <span class="logo-letterboxd-dots" aria-hidden="true"> <i /><i /><i /> </span>
                 <span>Letter</span>
                 <span class="logo-letterboxd-underline">boxd</span>
-              </span>
+              </a>
+              <a
+                v-if="mediaDetail.douban_id"
+                class="media-fact-source logo-badge logo-douban"
+                :href="getDoubanLink()"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="豆瓣"
+                title="豆瓣"
+              >
+                豆瓣
+              </a>
             </div>
           </div>
         </div>
@@ -2485,26 +2614,47 @@ a.crew-name {
 
 .media-facts-sources {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: center;
-  gap: 1.5rem;
-  min-block-size: 4.5rem;
+  gap: 0.75rem 1.125rem;
+  min-block-size: 3.5rem;
   border-block-start: 1px solid var(--media-facts-divider);
-  opacity: 0.92;
-  padding-block: 1rem;
-  padding-inline: 1.25rem;
+  padding-block: 0.875rem;
+  padding-inline: 1rem;
 }
 
+/* 底部图标均为该媒体的外部链接（Plex 为站内跳转按钮），统一交互与焦点样式 */
 .media-fact-source {
   display: inline-flex;
   flex: none;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  padding: 0;
+  background: none;
+  color: inherit;
+  font-family: inherit;
+  text-decoration: none;
+  cursor: pointer;
+  opacity: 0.9;
+  transition: opacity 0.15s ease;
+}
+
+.media-fact-source:hover {
+  opacity: 1;
+}
+
+.media-fact-source:focus-visible {
+  border-radius: 3px;
+  outline: 2px solid var(--mp-fg);
+  outline-offset: 2px;
 }
 
 .logo-tmdb {
   flex-direction: column;
-  align-items: center;
   color: #86cca6;
-  font-size: 0.5625rem;
+  font-size: 0.5rem;
   font-weight: 800;
   line-height: 1.05;
   letter-spacing: 0.01em;
@@ -2513,8 +2663,8 @@ a.crew-name {
 .logo-tmdb-pill {
   position: relative;
   display: block;
-  inline-size: 1.125rem;
-  block-size: 0.375rem;
+  inline-size: 1rem;
+  block-size: 0.3125rem;
   margin-block: 0.0625rem;
   border-radius: 999px;
   background: linear-gradient(90deg, #11b6dd, #86cca6);
@@ -2532,34 +2682,73 @@ a.crew-name {
   transform: translate(-50%, -50%);
 }
 
-.logo-red-circle {
-  inline-size: 2rem;
-  block-size: 2rem;
+/* 通用小徽标：IMDb / 豆瓣 等文字型来源 */
+.logo-badge {
+  min-inline-size: 1.75rem;
+  block-size: 0.9375rem;
+  border-radius: 2px;
+  padding-inline: 0.25rem;
+  font-size: 0.5rem;
+  font-weight: 800;
+  line-height: 1;
 }
 
-.logo-s {
-  align-items: center;
-  justify-content: center;
-  inline-size: 2rem;
-  block-size: 2rem;
-  border-radius: 9px;
+.logo-imdb {
+  background: #f6c700;
+  color: #000;
+  font-family: 'Arial Narrow', Impact, sans-serif;
+  font-weight: 900;
+  letter-spacing: -0.04em;
+}
+
+.logo-douban {
+  background: #2e963d;
+  color: #fff;
+  letter-spacing: 0.02em;
+}
+
+/* Plex 文字标识，保留品牌橙色的 x */
+.logo-plex-word {
+  color: var(--mp-fg);
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+
+.logo-plex-x {
+  color: #e5a00d;
+}
+
+.logo-trakt {
+  color: #ed1c24;
+}
+
+.logo-trakt svg {
+  inline-size: 1.25rem;
+  block-size: 1.25rem;
+}
+
+.logo-simkl {
+  inline-size: 1.25rem;
+  block-size: 1.25rem;
+  border-radius: 5px;
   background: #888b93;
   color: #263041;
-  font-size: 1.375rem;
+  font-size: 0.875rem;
   font-weight: 900;
   line-height: 1;
 }
 
 .logo-letterboxd {
   flex-direction: column;
-  align-items: center;
-  inline-size: 1.75rem;
-  block-size: 1.75rem;
-  border-radius: 4px;
-  padding-block-start: 0.1875rem;
+  inline-size: 1.5rem;
+  block-size: 1.5rem;
+  border-radius: 3px;
+  padding-block-start: 0.125rem;
   background: #19202c;
   color: #fff;
-  font-size: 0.5625rem;
+  font-size: 0.4375rem;
   font-weight: 800;
   line-height: 1;
 }
@@ -2567,12 +2756,12 @@ a.crew-name {
 .logo-letterboxd-dots {
   display: flex;
   gap: 2px;
-  margin-block-end: 2px;
+  margin-block-end: 1px;
 }
 
 .logo-letterboxd-dots i {
-  inline-size: 6px;
-  block-size: 6px;
+  inline-size: 4px;
+  block-size: 4px;
   border-radius: 50%;
   background: #de4c1a;
 }
