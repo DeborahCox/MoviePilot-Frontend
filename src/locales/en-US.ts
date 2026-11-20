@@ -14,7 +14,7 @@ export default {
       'retrying': 'Retrying…',
       'noDetail': 'No error details',
       'noneRetryable': 'All need configuration, nothing to retry',
-      'restrictedHint': 'Results may be incomplete: some sites failed to search',
+      'needsSiteAdmin': 'Ask a site admin to fix it',
       'expand': 'Expand',
       'collapse': 'Collapse',
       'copy': 'Copy',

@@ -154,6 +154,11 @@ const retryingCount = computed(() => {
 /** 可重试 = 0：重试按钮整颗不渲染，摘要行同位置给解释。 */
 const noneRetryable = computed(() => !props.retrying && retryableCount.value === 0 && coolingCount.value === 0)
 
+/** 无站点管理权限时「均需配置」是落空指令：改为中性说明，不指向用户做不到的动作。 */
+const noneRetryableHint = computed(() =>
+  props.canManageSites ? t('search.errors.noneRetryable') : t('search.errors.needsSiteAdmin'),
+)
+
 const hasRetried = computed(() => rows.value.some(row => row.retryCount > 0))
 
 /** 第 2 次重试之后主按钮转次级样式，不再抢注意力。 */
@@ -363,7 +368,7 @@ onBeforeUnmount(() => {
 
 <template>
   <section
-    v-if="rows.length && canManageSites"
+    v-if="rows.length"
     class="mpa"
     :class="{ 'mpa--compact': isCompact, 'mpa--expanded': showList }"
     :aria-label="t('search.errors.title', { n: failedCount })"
@@ -376,7 +381,7 @@ onBeforeUnmount(() => {
       <span class="mpa__live" role="status" aria-live="polite" aria-atomic="true">
         <span class="mpa__title">{{ titleText }}</span>
         <span v-if="subText" class="mpa__title-sub"> · {{ subText }}</span>
-        <span v-else-if="noneRetryable" class="mpa__title-sub"> · {{ t('search.errors.noneRetryable') }}</span>
+        <span v-else-if="noneRetryable" class="mpa__title-sub"> · {{ noneRetryableHint }}</span>
       </span>
 
       <!-- 收起态：聚合 chips 留在摘要行，保证收起后信息自足（N≥3 按 tone 聚合，N≤2 逐站点）。 -->
@@ -608,15 +613,6 @@ onBeforeUnmount(() => {
     <!-- 冷却归零的一次性播报（独立 role="status"，不在倒计时容器内）。 -->
     <span class="mpa__sr-only" role="status" aria-live="polite" aria-atomic="true">{{ readyAnnouncement }}</span>
   </section>
-
-  <section v-else-if="rows.length" class="mpa mpa--restricted" :aria-label="t('search.errors.restrictedHint')">
-    <div class="mpa__head">
-      <VIcon class="mpa__head-icon" icon="mdi-alert" size="16" aria-hidden="true" />
-      <span class="mpa__live" role="status" aria-live="polite" aria-atomic="true">
-        <span class="mpa__title">{{ t('search.errors.restrictedHint') }}</span>
-      </span>
-    </div>
-  </section>
 </template>
 
 <style scoped>
@@ -643,10 +639,6 @@ onBeforeUnmount(() => {
 .mpa--compact .mpa__head {
   min-height: 36px;
   padding: 5px 6px 5px 12px;
-  border-bottom: 0;
-}
-
-.mpa--restricted .mpa__head {
   border-bottom: 0;
 }
 
@@ -772,7 +764,7 @@ onBeforeUnmount(() => {
 }
 
 .mpa__btn-text-label {
-  display: none;
+  display: inline;
 }
 
 /* ===== 折叠摘要 chips（在摘要行内，flex 占满剩余宽度） ===== */
@@ -998,6 +990,7 @@ onBeforeUnmount(() => {
 
 /* 详情展开：18px 方形按钮，与详情行基线对齐，不占动作列。 */
 .mpa__detail-toggle {
+  position: relative;
   display: inline-flex;
   flex: 0 0 auto;
   align-items: center;
@@ -1010,6 +1003,13 @@ onBeforeUnmount(() => {
   background: transparent;
   color: rgba(var(--v-theme-on-surface), 0.52);
   cursor: pointer;
+}
+
+/* 命中区外扩 3px（视觉尺寸不变，行高 55px 与 max-height 275px 均不受影响）。 */
+.mpa__detail-toggle::before {
+  position: absolute;
+  inset: -3px;
+  content: '';
 }
 
 .mpa__detail-toggle:hover {
@@ -1352,7 +1352,7 @@ onBeforeUnmount(() => {
 }
 
 /* 摘要行极窄时隐藏折叠按钮的文字，只留图标。 */
-@media (max-width: 420px) {
+@media (max-width: 560px) {
   .mpa__btn-text-label {
     display: none;
   }
