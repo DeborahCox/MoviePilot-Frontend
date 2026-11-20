@@ -498,6 +498,7 @@ describe('MediaDetailView detail and actions', () => {
       title: '豆瓣独立电影',
       tmdb_id: undefined,
       type: '电影',
+      vote_average: 8.6,
     })
     const { container } = await renderDetail({ media, mediaId: 'db-8402' })
 
@@ -505,6 +506,11 @@ describe('MediaDetailView detail and actions', () => {
     expect(screen.getByText('Douban Original')).toBeInTheDocument()
     expect(screen.getByText('2026-02-02')).toBeInTheDocument()
     expect(screen.getByText('中国大陆')).toBeInTheDocument()
+    expect(screen.getByRole('group', { name: '豆瓣 8.6' })).toBeInTheDocument()
+    expect(within(screen.getByTestId('media-facts-sources')).getByRole('link', { name: '豆瓣' })).toHaveAttribute(
+      'href',
+      'https://movie.douban.com/subject/db-8402/',
+    )
     expect(container.querySelector('.media-poster img')).toHaveAttribute(
       'src',
       'https://images.example.com/douban-poster.jpg',
@@ -514,6 +520,38 @@ describe('MediaDetailView detail and actions', () => {
 
     await fireEvent.click(within(screen.getByTestId('media-source-links')).getByText('豆瓣'))
     expect(mocks.openDoubanApp).toHaveBeenCalledWith('db-8402', '电影', '豆瓣独立电影', '2026')
+  })
+
+  it('shows and opens Plex for an existing Douban movie', async () => {
+    const media = createMediaInfo({
+      douban_id: 'db-plex',
+      media_id: 'db-plex',
+      media_source: 'douban',
+      tmdb_id: undefined,
+      type: '电影',
+    })
+    server.use(
+      mediaPlayHandler('plex-item', {
+        data: { item_id: 'plex-item', server_id: 'plex-1', server_type: 'plex', url: 'https://plex.example/play' },
+        success: true,
+      }),
+    )
+    await renderDetail({
+      media,
+      existsResponse: { data: { item: { id: 'plex-item', server: 'Plex' } }, success: true },
+      setupHandlers: () =>
+        server.use(
+          http.get('http://localhost/api/v1/mediaserver/clients', () => apiJson([{ name: 'Plex', type: 'plex' }])),
+        ),
+    })
+    await userEvent.click(
+      await within(screen.getByTestId('media-facts-sources')).findByRole('button', { name: 'Plex' }),
+    )
+    await waitFor(() =>
+      expect(mocks.openMediaServerItem).toHaveBeenCalledWith(
+        expect.objectContaining({ item_id: 'plex-item', server_type: 'plex' }),
+      ),
+    )
   })
 
   it('renders Bangumi-only facts, external link, credits, and recommendations', async () => {
@@ -1556,12 +1594,17 @@ describe('共享 TMDB 对应关系', () => {
     })
     expect(screen.getByRole('heading', { name: /无需等待中心服务/ })).toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'TheMovieDb' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'The Movie Database' })).not.toBeInTheDocument()
     resolveMapping()
     await waitFor(() =>
       expect(screen.getByRole('link', { name: 'TheMovieDb' })).toHaveAttribute(
         'href',
         'https://www.themoviedb.org/movie/456',
       ),
+    )
+    expect(screen.getByRole('link', { name: 'The Movie Database' })).toHaveAttribute(
+      'href',
+      'https://www.themoviedb.org/movie/456',
     )
   })
 
@@ -1581,6 +1624,7 @@ describe('共享 TMDB 对应关系', () => {
     await flushPromises()
     expect(screen.getByRole('heading', { name: /降级详情/ })).toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'TheMovieDb' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'The Movie Database' })).not.toBeInTheDocument()
     expect(mocks.toastError).not.toHaveBeenCalled()
   })
 
