@@ -846,6 +846,11 @@ const tmdbRatingText = computed(() => {
   return typeof rating === 'number' && rating > 0 ? `${Math.round(rating * 10)}%` : ''
 })
 
+const doubanRatingText = computed(() => {
+  const rating = mediaDetail.value.vote_average
+  return typeof rating === 'number' && Number.isFinite(rating) && rating > 0 && rating <= 10 ? rating.toFixed(1) : ''
+})
+
 const hasRating = computed(() => Boolean(imdbRatingText.value || tmdbRatingText.value))
 
 const revenueText = computed(() => formatCurrency(mediaDetail.value.revenue))
@@ -1777,35 +1782,103 @@ useNativePageHeader({
           </div>
         </div>
         <div v-else-if="mediaDetail.douban_id" class="media-overview-right">
-          <div class="media-facts">
-            <div v-if="mediaDetail.vote_average" class="media-ratings">
-              <VRating v-model="mediaDetail.vote_average" density="compact" length="10" class="ma-2" readonly />
-            </div>
-            <div v-if="mediaDetail.douban_id" class="media-fact">
-              <span>{{ t('media.info.doubanId') }}</span>
-              <span class="media-fact-value">{{ mediaDetail.douban_id }}</span>
-            </div>
-            <div v-if="mediaDetail.original_title" class="media-fact">
-              <span>{{ t('media.info.originalTitle') }}</span>
-              <span class="media-fact-value">{{ mediaDetail.original_title }}</span>
-            </div>
-            <div v-if="mediaDetail.release_date" class="media-fact">
-              <span>{{ t('media.info.releaseDate') }}</span>
-              <span class="media-fact-value">
-                {{ mediaDetail.release_date }}
-              </span>
-            </div>
-            <div v-if="mediaDetail.production_countries" class="media-fact border-b-0">
-              <span>{{ t('media.info.productionCountries') }}</span>
-              <span class="media-fact-value">
-                <span
-                  v-for="country in getProductionCountries"
-                  :key="country"
-                  class="flex items-center justify-end text-end"
-                >
-                  {{ country }}
+          <div class="media-facts media-facts-douban">
+            <div class="media-facts-body">
+              <div
+                v-if="doubanRatingText"
+                class="media-facts-rating"
+                role="group"
+                :aria-label="`豆瓣 ${doubanRatingText}`"
+              >
+                <span class="media-facts-rating-item">
+                  <span class="rating-badge-douban" aria-hidden="true">豆瓣</span>
+                  <span class="media-facts-score num">{{ doubanRatingText }}</span>
                 </span>
-              </span>
+              </div>
+              <div v-if="mediaDetail.douban_id" class="media-fact">
+                <span class="media-fact-key">{{ t('media.info.doubanId') }}</span>
+                <span class="media-fact-value">{{ mediaDetail.douban_id }}</span>
+              </div>
+              <div v-if="mediaDetail.original_title" class="media-fact">
+                <span class="media-fact-key">{{ t('media.info.originalTitle') }}</span>
+                <span class="media-fact-value">{{ mediaDetail.original_title }}</span>
+              </div>
+              <div v-if="mediaDetail.release_date" class="media-fact">
+                <span class="media-fact-key">{{ t('media.info.releaseDate') }}</span>
+                <span class="media-fact-value">
+                  {{ mediaDetail.release_date }}
+                </span>
+              </div>
+              <div v-if="getProductionCountries?.length" class="media-fact">
+                <span class="media-fact-key">{{ t('media.info.productionCountries') }}</span>
+                <span class="media-fact-value">
+                  <span
+                    v-for="country in getProductionCountries"
+                    :key="country"
+                    class="flex items-center justify-end text-end"
+                  >
+                    {{ country }}
+                  </span>
+                </span>
+              </div>
+            </div>
+            <div
+              class="media-facts-sources"
+              data-testid="media-facts-sources"
+              role="group"
+              :aria-label="t('media.info.dataSource')"
+            >
+              <button
+                v-if="plexItemExists"
+                type="button"
+                class="media-fact-source logo-plex"
+                aria-label="Plex"
+                title="Plex"
+                @click="handlePlexSourceClick"
+              >
+                <span class="logo-plex-word" aria-hidden="true">ple<span class="logo-plex-x">x</span></span>
+              </button>
+              <a
+                v-if="sharedTmdbMapping"
+                class="media-fact-source logo-tmdb"
+                :href="getTheMovieDbLink()"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="The Movie Database"
+                title="The Movie Database"
+              >
+                <svg viewBox="0 0 36 16" class="logo-tmdb-badge" aria-hidden="true" focusable="false">
+                  <defs>
+                    <linearGradient id="tmdbDoubanFooterGradient" x1="0" y1="0" x2="1" y2="0">
+                      <stop offset="0" stop-color="#11B6DD" />
+                      <stop offset="1" stop-color="#86CCA6" />
+                    </linearGradient>
+                  </defs>
+                  <text x="0" y="8" fill="#86CCA6" font-family="Arial, sans-serif" font-size="9" font-weight="800">
+                    TM
+                  </text>
+                  <rect x="17" y="1" width="18" height="6" rx="1" fill="#11B6DD" />
+                  <rect x="1" y="9" width="18" height="6" rx="1" fill="url(#tmdbDoubanFooterGradient)" />
+                  <text x="21" y="15" fill="#43C0C6" font-family="Arial, sans-serif" font-size="9" font-weight="800">
+                    DB
+                  </text>
+                </svg>
+              </a>
+              <a
+                class="media-fact-source logo-douban"
+                :href="getDoubanLink()"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="豆瓣"
+                title="豆瓣"
+              >
+                <svg viewBox="0 0 24 24" class="logo-douban-mark" aria-hidden="true" focusable="false">
+                  <path
+                    fill="currentColor"
+                    d="M.51 3.06h22.98V.755H.51V3.06Zm20.976 2.537v9.608h-2.137l-1.669 5.76H24v2.28H0v-2.28h6.32l-1.67-5.76H2.515V5.597h18.972Zm-5.066 9.608H7.58l1.67 5.76h5.501l1.67-5.76ZM18.367 7.9H5.634v5.025h12.733V7.9Z"
+                  />
+                </svg>
+              </a>
             </div>
           </div>
         </div>
@@ -2496,7 +2569,8 @@ a.crew-name {
 }
 
 // TMDB 信息卡片：key 左 value 右，评分条与来源页脚独立于事实行
-.media-facts-tmdb .media-facts-rating {
+.media-facts-tmdb .media-facts-rating,
+.media-facts-douban .media-facts-rating {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2505,6 +2579,12 @@ a.crew-name {
   border-block-end: 1px solid var(--media-facts-divider);
   padding-block: 0.5rem;
   padding-inline: 1rem;
+}
+
+.rating-badge-douban {
+  color: #2e963d;
+  font-size: 0.875rem;
+  font-weight: 700;
 }
 
 .media-facts-rating-item {
@@ -2543,14 +2623,14 @@ a.crew-name {
   font-size: 0.625rem;
 }
 
-.media-facts-tmdb .media-fact {
+.media-facts-tmdb .media-fact,
+.media-facts-douban .media-fact {
   align-items: flex-start;
   justify-content: space-between;
   gap: 1rem;
   border-block-end: 1px solid var(--media-facts-divider);
   font-size: 0.9375rem;
   line-height: 1.375rem;
-  padding-block: 0.875rem;
   padding-inline: 1.25rem;
 }
 
@@ -2565,7 +2645,8 @@ a.crew-name {
   white-space: nowrap;
 }
 
-.media-facts-tmdb .media-fact-value {
+.media-facts-tmdb .media-fact-value,
+.media-facts-douban .media-fact-value {
   flex: 1 1 auto;
   min-inline-size: 0;
   color: var(--mp-muted-fg);
