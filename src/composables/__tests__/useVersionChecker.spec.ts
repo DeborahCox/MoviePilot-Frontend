@@ -29,6 +29,12 @@ describe('useVersionChecker', () => {
     expect(mocks.toastInfo).toHaveBeenCalledOnce()
   })
 
+  it('较新的 Fork 数字修订号提示更新', async () => {
+    const { useVersionChecker } = await import('@/composables/useVersionChecker')
+    await useVersionChecker().checkVersion(`${__APP_VERSION__}-1`)
+    expect(mocks.toastInfo).toHaveBeenCalledOnce()
+  })
+
   it('手动清理先同步撤销 App 在途榜单，再等待浏览器缓存清理', async () => {
     const { nativeReadonlyCache } = await import('@/native/cache')
     const clear = vi.spyOn(nativeReadonlyCache, 'clear')
