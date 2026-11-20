@@ -23,6 +23,9 @@ import {
 
 // 读取 package.json 获取版本号
 const packageJson = JSON.parse(readFileSync('./package.json', 'utf-8'))
+const appVersion = process.env.MOVIEPILOT_BUILD_VERSION || `v${packageJson.version}`
+if (process.env.MOVIEPILOT_BUILD_VERSION && !/^v\d+\.\d+\.\d+(?:-\d+)?$/.test(appVersion))
+  throw new Error(`Invalid build version: ${appVersion}`)
 const buildTime = new Date().getTime().toString()
 const isTestMode = (mode: string) => mode === 'test' || process.env.VITEST === 'true'
 
@@ -215,7 +218,7 @@ export default defineConfig(({ command, mode, isPreview }) => ({
   ],
   define: {
     'process.env': {},
-    '__APP_VERSION__': JSON.stringify(`v${packageJson.version}`),
+    '__APP_VERSION__': JSON.stringify(appVersion),
     '__BUILD_TIME__': JSON.stringify(buildTime),
     '__PWA_DEVELOPMENT__': JSON.stringify(isPwaDevelopmentEnabled(mode, process.env.npm_lifecycle_event)),
   },
