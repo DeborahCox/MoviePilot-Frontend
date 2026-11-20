@@ -10,7 +10,7 @@ permissions:
 
 concurrency:
   group: sync-upstream-frontend
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   sync:
@@ -27,7 +27,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-      - name: Rebase onto upstream v3
+      - name: Merge upstream v3
         id: sync
         run: |
           set -euo pipefail
@@ -39,8 +39,8 @@ jobs:
             echo "updated=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          git rebase upstream/v3
-          git push --force-with-lease origin v3
+          git merge --no-edit upstream/v3
+          git push origin HEAD:v3
           echo "updated=true" >> "$GITHUB_OUTPUT"
 
       - name: Summary
