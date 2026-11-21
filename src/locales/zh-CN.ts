@@ -1749,8 +1749,11 @@ export default {
   media: {
     status: {
       inLibrary: '已入库',
+      inLibraryHint: '媒体服务器或本地媒体库中已有本季全部剧集',
       missing: '缺失',
+      missingHint: '在媒体服务器（及已开启的本地文件检查）中未找到本季的 {count} 集',
       partiallyMissing: '部分缺失',
+      partiallyMissingHint: '媒体库中缺少 {episodes}，共 {count} 集',
       subscribed: '已订阅',
       seasonsSubscribed: '已订阅 {count} 季',
       allSeasonsSubscribed: '已全部订阅',
@@ -5990,6 +5993,14 @@ export default {
     scanModeHint: '用于全库刷新和按库刷新：新添加和修改 / 补充缺失 / 覆盖扫描',
     verifySsl: '校验 SSL 证书',
     verifySslHint: '开启后会校验 HTTPS 证书；如使用自签名证书可关闭',
+    connectionMode: '连接模式',
+    connectionModeHint:
+      '默认自动识别（9443 端口优先尝试媒体库服务，失败自动回退绿联账号）；「媒体库服务」需在绿联影视中心开启对应服务并填写媒体库服务账号',
+    connectionModeOptions: {
+      auto: '自动识别',
+      internal: '绿联账号（影视中心内部接口）',
+      mediaService: '媒体库服务（Emby 兼容接口）',
+    },
     scanModeOptions: {
       newAndModified: '新添加和修改',
       supplementMissing: '补充缺失',
