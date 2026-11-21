@@ -6268,6 +6268,7 @@ export default {
     genre: 'Genre',
     language: 'Language',
     rating: 'Rating',
+    year: 'Year',
     sortType: {
       popularityDesc: 'Popularity Descending',
       popularityAsc: 'Popularity Ascending',
@@ -6324,6 +6325,15 @@ export default {
       ar: 'Arabic',
       hi: 'Hindi',
       th: 'Thai',
+    },
+    yearType: {
+      '2020s': '2020s',
+      '2010s': '2010s',
+      '2000s': '2000s',
+      '1990s': '1990s',
+      '1980s': '1980s',
+      '1970s': '1970s',
+      '1960s': '1960s',
     },
   },
   douban: {

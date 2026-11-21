@@ -15,6 +15,7 @@ const filterParams = reactive({
   with_keywords: '',
   with_watch_providers: '',
   vote_average: 0,
+  release_year: '',
   release_date: '',
 })
 
@@ -106,6 +107,23 @@ const tmdbLanguageDict = {
   'ar': t('tmdb.languageType.ar'),
   'hi': t('tmdb.languageType.hi'),
   'th': t('tmdb.languageType.th'),
+}
+
+// 年代字典：键即传给后端的离散 code
+const tmdbYearDict: Record<string, string> = {
+  '2020s': t('tmdb.yearType.2020s'),
+  '2010s': t('tmdb.yearType.2010s'),
+  '2000s': t('tmdb.yearType.2000s'),
+  '1990s': t('tmdb.yearType.1990s'),
+  '1980s': t('tmdb.yearType.1980s'),
+  '1970s': t('tmdb.yearType.1970s'),
+  '1960s': t('tmdb.yearType.1960s'),
+}
+
+// 往年代字典中追加当前年份及往前5年的字典
+const currentYear = new Date().getFullYear()
+for (let i = 0; i < 6; i++) {
+  tmdbYearDict[`${currentYear - i}`] = `${currentYear - i}`
 }
 
 // 当前Key
@@ -200,6 +218,23 @@ watch(filterParams, () => {
           tile
           :value="key"
           v-for="(value, key) in tmdbLanguageDict"
+          :key="key"
+        >
+          {{ value }}
+        </VChip>
+      </VChipGroup>
+    </div>
+    <div class="flex justify-start align-center">
+      <div class="mr-5">
+        <VLabel>{{ t('tmdb.year') }}</VLabel>
+      </div>
+      <VChipGroup v-model="filterParams.release_year">
+        <VChip
+          :color="filterParams.release_year == key ? 'primary' : ''"
+          filter
+          tile
+          :value="key"
+          v-for="(value, key) in tmdbYearDict"
           :key="key"
         >
           {{ value }}
