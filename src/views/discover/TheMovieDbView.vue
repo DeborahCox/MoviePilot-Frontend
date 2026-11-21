@@ -15,7 +15,6 @@ const filterParams = reactive({
   with_keywords: '',
   with_watch_providers: '',
   vote_average: 0,
-  vote_count: 10,
   release_date: '',
 })
 
@@ -23,8 +22,11 @@ const filterParams = reactive({
 const listParams = computed(() => ({
   ...filterParams,
   vote_average: Number(filterParams.vote_average) || 0,
-  vote_count: Math.trunc(Number(filterParams.vote_count)) || 0,
 }))
+
+function normalizeRating() {
+  if (String(filterParams.vote_average).trim() === '') filterParams.vote_average = 0
+}
 
 // TMDB 电影排序字典
 const tmdbSortDict: Record<string, string> = {
@@ -218,18 +220,19 @@ watch(filterParams, () => {
         hide-details
       >
         <template v-slot:append>
-          <div class="d-flex align-center">
-            <VLabel class="mr-2">{{ t('tmdb.ratingVotes') }}</VLabel>
-            <VTextField
-              variant="outlined"
-              width="5rem"
-              v-model="filterParams.vote_count"
-              density="compact"
-              type="number"
-              hide-details
-              single-line
-            />
-          </div>
+          <VTextField
+            variant="outlined"
+            width="5rem"
+            v-model="filterParams.vote_average"
+            density="compact"
+            type="number"
+            min="0"
+            max="10"
+            step="0.5"
+            hide-details
+            single-line
+            @blur="normalizeRating"
+          />
         </template>
       </VSlider>
     </div>

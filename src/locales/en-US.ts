@@ -6256,7 +6256,6 @@ export default {
     genre: 'Genre',
     language: 'Language',
     rating: 'Rating',
-    ratingVotes: 'Vote Count',
     sortType: {
       popularityDesc: 'Popularity Descending',
       popularityAsc: 'Popularity Ascending',

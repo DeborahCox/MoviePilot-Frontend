@@ -1,11 +1,7 @@
 import TheMovieDbView from '@/views/discover/TheMovieDbView.vue'
 import { screen, waitFor } from '@testing-library/vue'
 import userEvent from '@testing-library/user-event'
-import { mount } from '@vue/test-utils'
-import { nextTick } from 'vue'
 import { renderWithProviders } from '@tests/support/render'
-import i18n from '@/plugins/i18n'
-import vuetify from '@/plugins/vuetify'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { createMediaListHarness, latestMediaListRequest } from './sourceViewTestUtils'
 
@@ -16,7 +12,6 @@ const INITIAL_PARAMS = {
   with_keywords: '',
   with_watch_providers: '',
   vote_average: 0,
-  vote_count: 10,
   release_date: '',
 }
 
@@ -81,7 +76,7 @@ describe('TheMovieDbView', () => {
     })
   })
 
-  it('preserves shared filters and the current numeric input types across type changes', async () => {
+  it('preserves shared filters and the current rating across type changes', async () => {
     const user = userEvent.setup()
     await renderView()
 
@@ -90,9 +85,6 @@ describe('TheMovieDbView', () => {
     await user.click(screen.getByText('中文'))
     screen.getByRole('slider').focus()
     await user.keyboard('{ArrowRight}'.repeat(7))
-    const voteCount = screen.getByRole('spinbutton')
-    await user.clear(voteCount)
-    await user.type(voteCount, '25')
     await user.click(screen.getByText('电视剧'))
 
     await waitFor(() => {
@@ -104,68 +96,62 @@ describe('TheMovieDbView', () => {
           with_genres: '16',
           with_original_language: 'zh',
           vote_average: 3.5,
-          vote_count: 25,
         },
       })
     })
   })
 
-  it('sends numeric zero when the vote count field is cleared, while keeping the input clearable', async () => {
+  it('sends numeric zero when the rating field is cleared, while keeping the input clearable', async () => {
     const user = userEvent.setup()
     await renderView()
 
-    const voteCount = screen.getByRole('spinbutton')
-    await user.clear(voteCount)
+    const rating = screen.getByRole('spinbutton')
+    await user.clear(rating)
 
     await waitFor(() => {
-      expect(latestMediaListRequest(mediaList).params.vote_count).toBe(0)
+      expect(latestMediaListRequest(mediaList).params.vote_average).toBe(0)
     })
-    expect((voteCount as HTMLInputElement).value).toBe('')
+    expect((rating as HTMLInputElement).value).toBe('')
   })
 
-  it('sends numeric zero when vote_average is emptied', async () => {
-    const harness = createMediaListHarness()
-    const wrapper = mount(TheMovieDbView, {
-      global: {
-        plugins: [vuetify, i18n],
-        stubs: { MediaCardListView: harness.stub },
-      },
-    })
-    const vm = wrapper.vm as unknown as { filterParams: { vote_average: number | string } }
-    vm.filterParams.vote_average = ''
-    await nextTick()
-
-    expect(latestMediaListRequest(harness).params.vote_average).toBe(0)
-    wrapper.unmount()
-  })
-
-  it('truncates a fractional vote count without mutating the input source', async () => {
-    const harness = createMediaListHarness()
-    const wrapper = mount(TheMovieDbView, {
-      global: {
-        plugins: [vuetify, i18n],
-        stubs: { MediaCardListView: harness.stub },
-      },
-    })
-    const vm = wrapper.vm as unknown as { filterParams: { vote_count: string | number } }
-    vm.filterParams.vote_count = '2.5'
-    await nextTick()
-
-    expect(latestMediaListRequest(harness).params.vote_count).toBe(2)
-    expect(vm.filterParams.vote_count).toBe('2.5')
-    wrapper.unmount()
-  })
-
-  it('steps the rating slider by half points and labels the vote count field', async () => {
+  it('normalizes an emptied rating to zero on blur', async () => {
     const user = userEvent.setup()
     await renderView()
 
-    expect(screen.getByText('评分人数')).toBeTruthy()
+    const rating = screen.getByRole('spinbutton')
+    await user.clear(rating)
+    await user.tab()
+
+    await waitFor(() => {
+      expect((rating as HTMLInputElement).value).toBe('0')
+      expect(latestMediaListRequest(mediaList).params.vote_average).toBe(0)
+    })
+  })
+
+  it('steps the rating slider by half points and mirrors the value into the number field', async () => {
+    const user = userEvent.setup()
+    await renderView()
+
     screen.getByRole('slider').focus()
     await user.keyboard('{ArrowRight}')
 
     await waitFor(() => {
       expect(latestMediaListRequest(mediaList).params.vote_average).toBe(0.5)
+      expect((screen.getByRole('spinbutton') as HTMLInputElement).value).toBe('0.5')
+    })
+  })
+
+  it('accepts an exact rating typed into the number field and syncs the slider', async () => {
+    const user = userEvent.setup()
+    await renderView()
+
+    const rating = screen.getByRole('spinbutton')
+    await user.clear(rating)
+    await user.type(rating, '8.5')
+
+    await waitFor(() => {
+      expect(latestMediaListRequest(mediaList).params.vote_average).toBe(8.5)
+      expect(screen.getByRole('slider').getAttribute('aria-valuenow')).toBe('8.5')
     })
   })
 
