@@ -139,6 +139,23 @@ describe('TheMovieDbView', () => {
     wrapper.unmount()
   })
 
+  it('truncates a fractional vote count without mutating the input source', async () => {
+    const harness = createMediaListHarness()
+    const wrapper = mount(TheMovieDbView, {
+      global: {
+        plugins: [vuetify, i18n],
+        stubs: { MediaCardListView: harness.stub },
+      },
+    })
+    const vm = wrapper.vm as unknown as { filterParams: { vote_count: string | number } }
+    vm.filterParams.vote_count = '2.5'
+    await nextTick()
+
+    expect(latestMediaListRequest(harness).params.vote_count).toBe(2)
+    expect(vm.filterParams.vote_count).toBe('2.5')
+    wrapper.unmount()
+  })
+
   it('steps the rating slider by half points and labels the vote count field', async () => {
     const user = userEvent.setup()
     await renderView()

@@ -23,7 +23,7 @@ const filterParams = reactive({
 const listParams = computed(() => ({
   ...filterParams,
   vote_average: Number(filterParams.vote_average) || 0,
-  vote_count: Number(filterParams.vote_count) || 0,
+  vote_count: Math.trunc(Number(filterParams.vote_count)) || 0,
 }))
 
 // TMDB 电影排序字典
