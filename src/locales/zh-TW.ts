@@ -1749,8 +1749,11 @@ export default {
   media: {
     status: {
       inLibrary: '已入庫',
+      inLibraryHint: '媒體伺服器或本地媒體庫中已有本季全部劇集',
       missing: '缺失',
+      missingHint: '在媒體伺服器（及已開啟的本地檔案檢查）中未找到本季的 {count} 集',
       partiallyMissing: '部分缺失',
+      partiallyMissingHint: '媒體庫中缺少 {episodes}，共 {count} 集',
       subscribed: '已訂閱',
       seasonsSubscribed: '已訂閱 {count} 季',
       allSeasonsSubscribed: '已全部訂閱',
@@ -5997,6 +6000,14 @@ export default {
     scanModeHint: '用於全庫刷新和按庫刷新：新添加和修改 / 補充缺失 / 覆蓋掃描',
     verifySsl: '校驗 SSL 憑證',
     verifySslHint: '開啟後會校驗 HTTPS 憑證；如使用自簽憑證可關閉',
+    connectionMode: '連線模式',
+    connectionModeHint:
+      '預設自動識別（9443 連接埠優先嘗試媒體庫服務，失敗自動回退綠聯帳號）；「媒體庫服務」需在綠聯影視中心開啟對應服務並填寫媒體庫服務帳號',
+    connectionModeOptions: {
+      auto: '自動識別',
+      internal: '綠聯帳號（影視中心內部介面）',
+      mediaService: '媒體庫服務（Emby 相容介面）',
+    },
     scanModeOptions: {
       newAndModified: '新添加和修改',
       supplementMissing: '補充缺失',
