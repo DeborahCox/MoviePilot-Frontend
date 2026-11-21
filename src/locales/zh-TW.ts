@@ -6097,6 +6097,7 @@ export default {
     genre: '風格',
     language: '語言',
     rating: '評分',
+    year: '年代',
     sortType: {
       popularityDesc: '熱度降序',
       popularityAsc: '熱度升序',
@@ -6153,6 +6154,15 @@ export default {
       ar: '阿拉伯語',
       hi: '印地語',
       th: '泰語',
+    },
+    yearType: {
+      '2020s': '2020年代',
+      '2010s': '2010年代',
+      '2000s': '2000年代',
+      '1990s': '90年代',
+      '1980s': '80年代',
+      '1970s': '70年代',
+      '1960s': '60年代',
     },
   },
   douban: {

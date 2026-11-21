@@ -12,6 +12,7 @@ const INITIAL_PARAMS = {
   with_keywords: '',
   with_watch_providers: '',
   vote_average: 0,
+  release_year: '',
   release_date: '',
 }
 
@@ -152,6 +153,47 @@ describe('TheMovieDbView', () => {
     await waitFor(() => {
       expect(latestMediaListRequest(mediaList).params.vote_average).toBe(8.5)
       expect(screen.getByRole('slider').getAttribute('aria-valuenow')).toBe('8.5')
+    })
+  })
+
+  it('sends the decade code when a decade chip is selected', async () => {
+    const user = userEvent.setup()
+    await renderView()
+
+    await user.click(screen.getByText('2020年代', { exact: true }))
+
+    await waitFor(() => {
+      expect(latestMediaListRequest(mediaList).params.release_year).toBe('2020s')
+    })
+  })
+
+  it('sends the current year code when the current year chip is selected', async () => {
+    const user = userEvent.setup()
+    await renderView()
+
+    const currentYear = String(new Date().getFullYear())
+    await user.click(screen.getByText(currentYear, { exact: true }))
+
+    await waitFor(() => {
+      expect(latestMediaListRequest(mediaList).params.release_year).toBe(currentYear)
+    })
+  })
+
+  it('keeps the selected year when switching between movie and TV types', async () => {
+    const user = userEvent.setup()
+    await renderView()
+
+    await user.click(screen.getByText('2020年代', { exact: true }))
+    await user.click(screen.getByText('电视剧'))
+
+    await waitFor(() => {
+      expect(latestMediaListRequest(mediaList)).toEqual({
+        apipath: 'discover/tmdb_tvs',
+        params: {
+          ...INITIAL_PARAMS,
+          release_year: '2020s',
+        },
+      })
     })
   })
 
