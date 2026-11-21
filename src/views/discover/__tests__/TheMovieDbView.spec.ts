@@ -1,7 +1,11 @@
 import TheMovieDbView from '@/views/discover/TheMovieDbView.vue'
 import { screen, waitFor } from '@testing-library/vue'
 import userEvent from '@testing-library/user-event'
+import { mount } from '@vue/test-utils'
+import { nextTick } from 'vue'
 import { renderWithProviders } from '@tests/support/render'
+import i18n from '@/plugins/i18n'
+import vuetify from '@/plugins/vuetify'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { createMediaListHarness, latestMediaListRequest } from './sourceViewTestUtils'
 
@@ -99,10 +103,52 @@ describe('TheMovieDbView', () => {
           sort_by: 'vote_average.desc',
           with_genres: '16',
           with_original_language: 'zh',
-          vote_average: 7,
-          vote_count: '25',
+          vote_average: 3.5,
+          vote_count: 25,
         },
       })
+    })
+  })
+
+  it('sends numeric zero when the vote count field is cleared, while keeping the input clearable', async () => {
+    const user = userEvent.setup()
+    await renderView()
+
+    const voteCount = screen.getByRole('spinbutton')
+    await user.clear(voteCount)
+
+    await waitFor(() => {
+      expect(latestMediaListRequest(mediaList).params.vote_count).toBe(0)
+    })
+    expect((voteCount as HTMLInputElement).value).toBe('')
+  })
+
+  it('sends numeric zero when vote_average is emptied', async () => {
+    const harness = createMediaListHarness()
+    const wrapper = mount(TheMovieDbView, {
+      global: {
+        plugins: [vuetify, i18n],
+        stubs: { MediaCardListView: harness.stub },
+      },
+    })
+    const vm = wrapper.vm as unknown as { filterParams: { vote_average: number | string } }
+    vm.filterParams.vote_average = ''
+    await nextTick()
+
+    expect(latestMediaListRequest(harness).params.vote_average).toBe(0)
+    wrapper.unmount()
+  })
+
+  it('steps the rating slider by half points and labels the vote count field', async () => {
+    const user = userEvent.setup()
+    await renderView()
+
+    expect(screen.getByText('评分人数')).toBeTruthy()
+    screen.getByRole('slider').focus()
+    await user.keyboard('{ArrowRight}')
+
+    await waitFor(() => {
+      expect(latestMediaListRequest(mediaList).params.vote_average).toBe(0.5)
     })
   })
 
