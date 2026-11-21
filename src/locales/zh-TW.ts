@@ -6086,6 +6086,7 @@ export default {
     genre: '風格',
     language: '語言',
     rating: '評分',
+    ratingVotes: '評分人數',
     sortType: {
       popularityDesc: '熱度降序',
       popularityAsc: '熱度升序',

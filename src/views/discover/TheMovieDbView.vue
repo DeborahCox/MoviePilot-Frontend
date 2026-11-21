@@ -19,6 +19,13 @@ const filterParams = reactive({
   release_date: '',
 })
 
+/** 空串进 query 会触发后端 422；只在传出时兜底，保留输入框可清空重输。 */
+const listParams = computed(() => ({
+  ...filterParams,
+  vote_average: Number(filterParams.vote_average) || 0,
+  vote_count: Number(filterParams.vote_count) || 0,
+}))
+
 // TMDB 电影排序字典
 const tmdbSortDict: Record<string, string> = {
   'popularity.desc': t('tmdb.sortType.popularityDesc'),
@@ -206,26 +213,29 @@ watch(filterParams, () => {
         thumb-label
         max="10"
         min="0"
-        :step="1"
+        :step="0.5"
         class="align-center"
         hide-details
       >
         <template v-slot:append>
-          <VTextField
-            variant="outlined"
-            width="5rem"
-            v-model="filterParams.vote_count"
-            density="compact"
-            type="number"
-            hide-details
-            single-line
-          />
+          <div class="d-flex align-center">
+            <VLabel class="mr-2">{{ t('tmdb.ratingVotes') }}</VLabel>
+            <VTextField
+              variant="outlined"
+              width="5rem"
+              v-model="filterParams.vote_count"
+              density="compact"
+              type="number"
+              hide-details
+              single-line
+            />
+          </div>
         </template>
       </VSlider>
     </div>
   </div>
 
   <div>
-    <MediaCardListView :key="currentKey" :apipath="`discover/tmdb_${type}`" :params="filterParams" />
+    <MediaCardListView :key="currentKey" :apipath="`discover/tmdb_${type}`" :params="listParams" />
   </div>
 </template>
