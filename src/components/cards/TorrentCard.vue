@@ -108,9 +108,13 @@ function openTorrentDetail(item: Context | null = null) {
   }
 }
 
-/** 为已确认的促销选择样式，未知倍率不落入免费颜色。 */
+/** 为已确认的促销选择语义柔和胶囊类，未知倍率不落入免费颜色。 */
 function getPromotionClass(kind?: TorrentPromotionKind) {
-  return kind ? { free: 'bg-success', discount: 'bg-orange', bonus: 'bg-purple', other: '' }[kind] : ''
+  return kind
+    ? { free: 'torrent-promo--free', discount: 'torrent-promo--discount', bonus: 'torrent-promo--bonus', other: '' }[
+        kind
+      ]
+    : ''
 }
 
 /** 只有站点明确标注的字幕能作为筛选入口，其余标签保持静态。 */
@@ -229,7 +233,7 @@ watch(
       <!-- 优惠标签 -->
       <div
         v-if="promotionKind"
-        class="discount-banner text-white px-2 py-1 text-sm font-weight-bold rounded-bl-lg"
+        class="discount-banner torrent-promo px-2 py-1 text-xs font-weight-semibold rounded-bl-lg"
         :class="getPromotionClass(promotionKind)"
       >
         {{ torrent?.volume_factor }}
@@ -238,14 +242,14 @@ watch(
       <!-- 媒体标题 -->
       <VCardItem class="pt-3 pb-0">
         <div class="d-flex flex-row flex-wrap justify-start align-center mb-2 pr-8">
-          <span class="text-h6 font-weight-bold me-2 torrent-heading">
+          <span class="text-h6 font-weight-semibold me-2 torrent-heading">
             {{ getTorrentTitle(props.torrent) }}
           </span>
           <MusicMatchBadge :context="props.torrent" />
           <VChip
             v-if="meta?.season_episode"
-            class="chip-season rounded-sm font-weight-bold"
-            variant="elevated"
+            class="chip-season num rounded-sm font-weight-semibold"
+            variant="flat"
             size="small"
           >
             {{ meta?.season_episode }}
@@ -266,15 +270,15 @@ watch(
             <VAvatar v-else size="20" class="mr-2 text-caption bg-surface-variant" color="surface-variant">
               {{ torrent?.site_name?.substring(0, 1) }}
             </VAvatar>
-            <span class="font-weight-bold text-body-2">{{ torrent?.site_name }}</span>
+            <span class="font-weight-semibold text-body-2">{{ torrent?.site_name }}</span>
           </div>
 
-          <div class="d-flex align-center gap-3">
-            <span v-if="torrent?.seeders" class="d-flex align-center font-weight-bold">
+          <div class="d-flex align-center gap-3 num">
+            <span v-if="torrent?.seeders" class="d-flex align-center font-weight-semibold">
               <VIcon size="small" color="success" icon="mdi-arrow-up" class="mr-1"></VIcon>
               {{ torrent?.seeders }}
             </span>
-            <span v-if="torrent?.peers" class="d-flex align-center font-weight-bold">
+            <span v-if="torrent?.peers" class="d-flex align-center font-weight-semibold">
               <VIcon size="small" color="warning" icon="mdi-arrow-down" class="mr-1"></VIcon>
               {{ torrent?.peers }}
             </span>
@@ -300,8 +304,8 @@ watch(
 
         <!-- 发布时间 -->
         <div v-if="torrent?.pubdate" class="d-flex align-center justify-start mb-2">
-          <VIcon size="small" color="grey" icon="mdi-clock-outline" class="me-1"></VIcon>
-          <span class="text-sm text-medium-emphasis">{{ formatDateDifference(torrent.pubdate) }}</span>
+          <VIcon size="small" color="medium-emphasis" icon="mdi-clock-outline" class="me-1"></VIcon>
+          <span class="num text-sm text-medium-emphasis">{{ formatDateDifference(torrent.pubdate) }}</span>
         </div>
 
         <!-- 资源标签区：白名单标签可点击筛选，其余保持静态 -->
@@ -311,7 +315,7 @@ watch(
             :key="tag.key"
             :class="[tag.className, 'rounded-sm', ...filterTagClasses(tag)]"
             size="x-small"
-            variant="elevated"
+            variant="flat"
             v-bind="filterTagAttrs(tag)"
             @click.stop="handleTagClick(tag, $event)"
             @keydown.enter.space.stop.prevent="toggleFilterTag(tag)"
@@ -329,7 +333,7 @@ watch(
             :key="`label-${index}`"
             :class="['chip-label', 'rounded-sm', ...filterTagClasses(entry.tag)]"
             size="x-small"
-            variant="elevated"
+            variant="flat"
             v-bind="filterTagAttrs(entry.tag)"
             @click.stop="handleTagClick(entry.tag, $event)"
             @keydown.enter.space.stop.prevent="toggleFilterTag(entry.tag)"
@@ -345,21 +349,21 @@ watch(
           </VChip>
 
           <!-- 特殊标签保持静态 -->
-          <VChip v-if="torrent?.hit_and_run" class="chip-hr rounded-sm" size="x-small" variant="elevated">H&R</VChip>
-          <VChip v-if="torrent?.freedate_diff" class="chip-expire rounded-sm" size="x-small" variant="elevated">
+          <VChip v-if="torrent?.hit_and_run" class="chip-hr rounded-sm" size="x-small" variant="flat">H&R</VChip>
+          <VChip v-if="torrent?.freedate_diff" class="chip-expire num rounded-sm" size="x-small" variant="flat">
             {{ torrent?.freedate_diff }}
           </VChip>
         </div>
       </VCardText>
 
       <!-- 卡片底部信息 -->
-      <VCardActions class="border-t border-opacity-10 mt-auto pa-2">
+      <VCardActions class="torrent-card-actions mt-auto pa-2">
         <div v-if="props.more && props.more.length > 0">
           <VBtn
             variant="text"
             color="primary"
             size="small"
-            class="pa-1 d-flex align-center"
+            class="num pa-1 d-flex align-center"
             @click.stop="openMoreTorrentsDialog"
           >
             <VIcon icon="mdi-chevron-down" size="small" class="mr-1"></VIcon>
@@ -371,7 +375,7 @@ watch(
 
         <!-- 体积和详情按钮并排 -->
         <div class="d-flex align-center">
-          <VChip v-if="torrent?.size" color="primary" size="x-small" variant="elevated" class="rounded-sm mr-2">
+          <VChip v-if="torrent?.size" color="primary" size="x-small" variant="tonal" class="num rounded-sm mr-2">
             {{ formatFileSize(torrent.size) }}
           </VChip>
           <VBtn icon size="small" variant="text" color="primary" @click.stop="openTorrentDetail()">
@@ -406,81 +410,12 @@ watch(
 }
 
 .torrent-card-hover-area:hover .torrent-card {
-  border-color: rgba(var(--v-theme-primary), 0.3);
+  border-color: var(--mp-primary-border);
   transform: translate3d(0, -0.25rem, 0);
 }
 
-/* 优惠标签样式 */
-.bg-success {
-  background-color: #4caf50;
-}
-
-.bg-orange {
-  background-color: #ff5722;
-}
-
-.bg-purple {
-  background-color: #9c27b0;
-}
-
-.chip-season {
-  background-color: #3f51b5;
-  color: white;
-}
-
-.chip-web-source {
-  background-color: #8000ff;
-  color: white;
-}
-
-.chip-edition {
-  background-color: #f44336;
-  color: white;
-}
-
-.chip-resolution {
-  background-color: #7b1fa2;
-  color: white;
-}
-
-.chip-codec {
-  background-color: #ff9800;
-  color: white;
-}
-
-.chip-team {
-  background-color: #00897b;
-  color: white;
-}
-
-.chip-label {
-  background-color: #5c6bc0;
-  color: white;
-}
-
-.chip-hr {
-  background-color: #212121;
-  color: white;
-}
-
-.chip-expire {
-  background-color: #7e57c2;
-  color: white;
-}
-
-.chip-free {
-  background-color: #4caf50;
-  color: white;
-}
-
-.chip-discount {
-  background-color: #ff5722;
-  color: white;
-}
-
-.chip-bonus {
-  background-color: #9c27b0;
-  color: white;
+.torrent-card-actions {
+  border-block-start: 1px solid var(--mp-card-dock-border);
 }
 
 /* ===== 卡片标签筛选：保留分类色底，只叠加主色双环与常驻槽位 ===== */

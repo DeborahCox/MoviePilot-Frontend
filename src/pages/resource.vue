@@ -1753,7 +1753,7 @@ useNativePageHeader({
     },
     {
       title: t('resource.aiRecommend'),
-      icon: 'lucide:sparkles',
+      icon: 'mdi-check-decagram-outline',
       show:
         showResultHeader.value &&
         !isSubtitleSearch.value &&
@@ -1764,7 +1764,7 @@ useNativePageHeader({
     },
     {
       title: t('resource.reRecommend'),
-      icon: 'mdi-auto-fix',
+      icon: 'mdi-refresh',
       show:
         showResultHeader.value &&
         !isSubtitleSearch.value &&
@@ -1824,7 +1824,7 @@ useNativePageHeader({
                 </VChip>
               </div>
             </div>
-            <div class="progress-percentage">{{ searchProgressLabel }}</div>
+            <div class="progress-percentage num">{{ searchProgressLabel }}</div>
           </div>
           <div class="progress-bar-container">
             <VProgressLinear
@@ -1910,7 +1910,7 @@ useNativePageHeader({
             @click="toggleAiRecommend"
           >
             <template #prepend>
-              <VIcon icon="lucide:sparkles" size="18" />
+              <VIcon icon="mdi-check-decagram-outline" size="18" />
             </template>
             <span class="ai-action-group__label">{{ t('resource.aiRecommend') }}</span>
             <VTooltip activator="parent" location="top">
@@ -1921,7 +1921,7 @@ useNativePageHeader({
           <VExpandXTransition>
             <div v-if="aiRecommended || isRecommending" class="ai-action-group__more">
               <IconBtn variant="text" color="gray" :disabled="isRecommending || !aiStatusChecked" @click="reRecommend">
-                <VIcon :icon="isRecommending ? 'line-md:loading-twotone-loop' : 'mdi-auto-fix'" />
+                <VIcon :icon="isRecommending ? 'line-md:loading-twotone-loop' : 'mdi-refresh'" />
                 <VTooltip activator="parent" location="top">
                   {{ t('resource.reRecommend') }}
                 </VTooltip>
@@ -1956,11 +1956,13 @@ useNativePageHeader({
 
     <!-- 搜索结果 -->
     <div v-if="isRefreshed && hasData" class="search-results-container">
-      <VTabs v-if="hasMusicCandidates && !progressActive" v-model="musicResultMode" class="mb-3" density="compact">
-        <VTab value="all">{{ t('torrent.musicMatch.all') }}</VTab>
-        <VTab value="exact">{{ t('torrent.musicMatch.exact') }}</VTab>
-        <VTab value="candidate">{{ t('torrent.musicMatch.candidate') }}</VTab>
-      </VTabs>
+      <div v-if="hasMusicCandidates && !progressActive" class="app-filter-bar app-filter-bar--compact mb-3">
+        <VTabs v-model="musicResultMode" density="compact">
+          <VTab value="all">{{ t('torrent.musicMatch.all') }}</VTab>
+          <VTab value="exact">{{ t('torrent.musicMatch.exact') }}</VTab>
+          <VTab value="candidate">{{ t('torrent.musicMatch.candidate') }}</VTab>
+        </VTabs>
+      </div>
       <!-- 筛选栏 -->
       <TorrentFilterBar
         v-if="!progressActive && !isSubtitleSearch"
@@ -2333,9 +2335,9 @@ useNativePageHeader({
 
 .progress-percentage {
   flex: 0 0 auto;
-  color: rgb(var(--v-theme-primary));
+  color: var(--mp-primary-fg);
   font-size: 0.95rem;
-  font-weight: 700;
+  font-weight: 600;
   min-inline-size: 44px;
   text-align: end;
 }
@@ -2349,11 +2351,11 @@ useNativePageHeader({
 .search-skeleton-card,
 .search-skeleton-list {
   overflow: hidden;
-  background: rgb(var(--v-theme-surface));
+  background: var(--mp-card);
 }
 
 .search-skeleton-row + .search-skeleton-row {
-  border-block-start: 1px solid rgba(var(--v-theme-on-surface), 0.08);
+  border-block-start: 1px solid var(--mp-list-row-divider);
 }
 
 .stream-result-item {
@@ -2399,17 +2401,17 @@ useNativePageHeader({
   display: flex;
   overflow: hidden;
   align-items: center;
-  border: 1px solid rgba(var(--v-theme-on-surface), 0.12);
-  border-radius: 8px;
+  border: 1px solid var(--mp-border);
+  border-radius: var(--app-control-radius);
 }
 
 .ai-action-group--active {
-  border-color: rgba(var(--v-theme-primary), 0.24);
-  background-color: rgba(var(--v-theme-primary), 0.08);
+  border-color: var(--mp-primary-border);
+  background-color: var(--mp-primary-soft);
 }
 
 .ai-action-group__primary {
-  border-radius: 8px 0 0 8px !important;
+  border-radius: var(--app-control-radius) 0 0 var(--app-control-radius) !important;
   padding-inline: 14px 12px !important;
 }
 
@@ -2421,12 +2423,13 @@ useNativePageHeader({
 .ai-action-group__more {
   display: flex;
   align-items: center;
-  border-inline-start: 1px solid rgba(var(--v-theme-on-surface), 0.12);
+  border-inline-start: 1px solid var(--mp-border);
 }
 
 .search-results-container {
   position: relative;
   min-block-size: 50vh;
+  padding-block-end: var(--mp-bottom-clearance);
 }
 
 /* 卡片网格布局 */

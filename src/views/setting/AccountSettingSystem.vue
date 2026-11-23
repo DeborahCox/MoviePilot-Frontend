@@ -150,6 +150,7 @@ const systemSettingsDefaults = {
     MUSIC_METADATA_TO_SIMPLIFIED: true,
     MUSIC_LYRICS_TO_SIMPLIFIED: false,
     MUSIC_CUE_ENABLE: true,
+    MUSIC_TRACK_MATCH: 'strict',
     MUSIC_LOCAL_COVER_ENABLE: true,
     MUSIC_RELEASE_REGION_PRIORITY: 'CN,TW,HK',
     MUSIC_RELEASE_SCRIPT_PRIORITY: 'Hans,Hant,Latn',
@@ -1375,6 +1376,30 @@ function preferenceSelection(setting: 'MUSIC_RELEASE_REGION_PRIORITY' | 'MUSIC_R
 const musicReleaseRegionSelection = preferenceSelection('MUSIC_RELEASE_REGION_PRIORITY')
 const musicReleaseScriptSelection = preferenceSelection('MUSIC_RELEASE_SCRIPT_PRIORITY')
 
+// 自动整理音乐专辑允许的曲目对齐策略，与后端 MUSIC_TRACK_MATCH 保持一致
+const MUSIC_TRACK_MATCH_VALUES = ['strict', 'fallback_ignore_duration', 'ignore_duration'] as const
+type MusicTrackMatchMode = (typeof MUSIC_TRACK_MATCH_VALUES)[number]
+
+/** 自动整理曲目对齐方式下拉选项。 */
+const musicTrackMatchItems = computed<Array<{ title: string; value: MusicTrackMatchMode }>>(() => [
+  { title: t('setting.system.musicTrackMatchStrict'), value: 'strict' },
+  { title: t('setting.system.musicTrackMatchFallback'), value: 'fallback_ignore_duration' },
+  { title: t('setting.system.musicTrackMatchIgnoreDuration'), value: 'ignore_duration' },
+])
+
+/** 规范化自动整理曲目对齐配置，空值或未知取值回退为严格校验。 */
+const musicTrackMatchSelection = computed<MusicTrackMatchMode>({
+  get: () => {
+    const raw = String(SystemSettings.value.Advanced.MUSIC_TRACK_MATCH ?? '')
+      .trim()
+      .toLowerCase()
+    return (MUSIC_TRACK_MATCH_VALUES as readonly string[]).includes(raw) ? (raw as MusicTrackMatchMode) : 'strict'
+  },
+  set: (value: MusicTrackMatchMode) => {
+    SystemSettings.value.Advanced.MUSIC_TRACK_MATCH = value || 'strict'
+  },
+})
+
 // 加载刮削开关设置
 async function loadScrapingSwitchs() {
   try {
@@ -1955,7 +1980,7 @@ const nativeAddMediaServerMenu = computed<NativeStandaloneMenuBinding>(() => ({
                           >
                             {{ server.name }}
                           </VChip>
-                          <VChip v-if="agentMcpServers.length > 3" size="small" variant="tonal">
+                          <VChip v-if="agentMcpServers.length > 3" size="small" variant="tonal" class="num">
                             +{{ agentMcpServers.length - 3 }}
                           </VChip>
                         </div>
@@ -2774,6 +2799,16 @@ const nativeAddMediaServerMenu = computed<NativeStandaloneMenuBinding>(() => ({
                       prepend-inner-icon="mdi-music"
                     />
                   </VCol>
+                  <VCol cols="12" md="6">
+                    <VSelect
+                      v-model="musicTrackMatchSelection"
+                      :items="musicTrackMatchItems"
+                      :label="t('setting.system.musicTrackMatch')"
+                      :hint="t('setting.system.musicTrackMatchHint')"
+                      persistent-hint
+                      prepend-inner-icon="mdi-playlist-check"
+                    />
+                  </VCol>
                   <VCol v-if="isModuleEnabled('MusicBrainzModule')" cols="12" md="6">
                     <VSwitch
                       v-model="SystemSettings.Advanced.MUSIC_METADATA_TO_SIMPLIFIED"
@@ -3588,14 +3623,15 @@ const nativeAddMediaServerMenu = computed<NativeStandaloneMenuBinding>(() => ({
 .media-settings-section + .media-settings-section {
   margin-block-start: 1.75rem;
   padding-block-start: 1.5rem;
-  border-block-start: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
+  border-block-start: 1px solid var(--mp-border);
 }
 
 .setting-actions {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 1rem;
+  gap: 0.75rem 1rem;
 }
 
 .setting-actions__secondary {

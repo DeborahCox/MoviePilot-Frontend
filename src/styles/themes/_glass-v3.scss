@@ -184,8 +184,7 @@ $-custom-content-surfaces: (
         outline-offset: 2px;
       }
 
-      .dashboard-grid-content-measure > .v-card :is(h4, h5, h6),
-      .site-card .font-semibold {
+      .dashboard-grid-content-measure > .v-card :is(h4, h5, h6) {
         font-variant-numeric: tabular-nums;
       }
 
@@ -195,21 +194,6 @@ $-custom-content-surfaces: (
         box-shadow: none !important;
         backdrop-filter: none !important;
         -webkit-backdrop-filter: none !important;
-      }
-
-      .layout-page-content .site-card h3,
-      .layout-page-content .plugin-card__banner .v-card-title {
-        font-weight: 650;
-        letter-spacing: 0;
-      }
-
-      .layout-page-content .plugin-card__banner {
-        // 品牌染色与吸收继续由各材质公式决定，分割线保持极轻呼吸感以免割裂整卡材质。
-        border-block-end: 1px solid var(--mp-card-dock-border, rgba(255, 255, 255, 0.055));
-      }
-
-      .layout-page-content .plugin-card__banner .text-shadow {
-        text-shadow: none;
       }
     }
   }
@@ -568,7 +552,7 @@ $-custom-content-surfaces: (
       -webkit-backdrop-filter: none !important;
 
       &.footer-nav-btn-active {
-        color: rgb(var(--v-theme-primary)) !important;
+        color: var(--mp-primary-fg) !important;
         background: rgba(255, 255, 255, 0.14) !important;
       }
 
@@ -776,6 +760,45 @@ $-custom-content-surfaces: (
         background: rgb(var(--glass-popup-rgb)) !important;
         backdrop-filter: none !important;
         -webkit-backdrop-filter: none !important;
+      }
+    }
+
+    // 浅色玻璃降低透明度时回退为实白表面，补充柔和冷灰细边防止卡片与浅色画布融为一体。
+    html[data-theme='glass'][data-glass-color-scheme='light'][data-glass-appearance] body[data-theme='glass'] {
+      .layout-wrapper[data-shell-mode='desktop'] .layout-navbar,
+      .layout-wrapper[data-shell-mode].layout-navbar-fixed .layout-navbar,
+      .layout-wrapper[data-shell-mode].layout-navbar-fixed .layout-navbar::before,
+      .layout-wrapper[data-shell-mode] .layout-navbar,
+      .layout-wrapper[data-shell-mode] .layout-navbar::before,
+      .footer-nav-card,
+      .layout-wrapper[data-shell-mode='desktop'] .layout-vertical-nav::before,
+      .layout-page-content
+        .v-card:not(
+          .v-card .v-card,
+          .file-browser-view .v-card,
+          .no-blur,
+          .media-card,
+          .playing-card,
+          .bg-primary,
+          .bg-success,
+          .bg-info,
+          .bg-warning,
+          .bg-error
+        ),
+      .layout-page-content
+        :is(.site-card, .plugin-card, .downloading-card, .subscribe-card, .workflow-task-card, .workflow-share-card),
+      .layout-page-content :is(#{$-custom-content-surfaces}),
+      .dashboard-grid-content-measure > .v-card,
+      .dashboard-grid-content-measure > :first-child > .v-card {
+        border: 1px solid rgba(15, 23, 42, 0.1) !important;
+      }
+
+      [data-native-page-heading] .v-btn.v-btn--variant-text,
+      .slider-header .view-all-button {
+        border: 1px solid rgba(15, 23, 42, 0.1) !important;
+        -webkit-backdrop-filter: none !important;
+        backdrop-filter: none !important;
+        background: rgb(var(--glass-popup-rgb)) !important;
       }
     }
   }

@@ -366,7 +366,7 @@ onUnmounted(cleanupDrag)
     class="file-workspace"
     :style="{
       height: workspaceHeight !== undefined ? `${workspaceHeight}px` : undefined,
-      '--file-list-fab-clearance': floatingNewFolderVisible ? 'var(--app-fab-clearance)' : '0px',
+      '--file-list-fab-clearance': floatingNewFolderVisible ? 'var(--mp-bottom-clearance)' : '0px',
     }"
     :aria-busy="loading > 0"
   >
@@ -569,7 +569,7 @@ onUnmounted(cleanupDrag)
 
 .divider-dragging .divider-icon {
   background-color: rgba(var(--v-theme-surface), 0.95);
-  color: rgb(var(--v-theme-primary));
+  color: var(--mp-primary-fg);
   opacity: 1;
 }
 
