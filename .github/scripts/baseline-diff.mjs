@@ -45,6 +45,9 @@ export function readReport(path, exitCode) {
       }
     }
   }
+  if ((payload.numTotalTests ?? 0) === 0 && (payload.numFailedTestSuites ?? 0) > 0) {
+    failures.add(`__suite_load_error__:${payload.numFailedTestSuites}`)
+  }
   return { failures, missing: false, exitCode }
 }
 

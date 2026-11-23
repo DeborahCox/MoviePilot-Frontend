@@ -52,9 +52,9 @@ jobs:
         env:
           BASE_SHA: ${{ steps.base.outputs.sha }}
         run: |
-          git worktree add --detach baseline "$BASE_SHA"
-          cp package.json yarn.lock baseline/
-          mkdir -p reports baseline/reports
+          git worktree add --detach "$RUNNER_TEMP/baseline" "$BASE_SHA"
+          cp package.json yarn.lock "$RUNNER_TEMP/baseline/"
+          mkdir -p reports "$RUNNER_TEMP/baseline/reports"
 
       - name: Setup Node
         uses: actions/setup-node@v7
@@ -68,7 +68,7 @@ jobs:
         run: yarn --frozen-lockfile
 
       - name: Install dependencies (baseline)
-        working-directory: baseline
+        working-directory: ${{ runner.temp }}/baseline
         run: yarn --frozen-lockfile
 
       - name: Validate comparator
@@ -78,14 +78,16 @@ jobs:
         shell: bash
         run: |
           set +e
-          yarn test:run --serial --reporter=json --outputFile=reports/head.json --silent=passed-only
+          yarn test:run --serial --root="$PWD" --reporter=json --outputFile=reports/head.json --silent=passed-only
           echo $? > reports/head.exit
           (
-            cd baseline
-            yarn test:run --serial --reporter=json --outputFile=reports/baseline.json --silent=passed-only
+            cd "$RUNNER_TEMP/baseline"
+            yarn test:run --serial --root="$PWD" --reporter=json --outputFile=reports/baseline.json --silent=passed-only
           )
           echo $? > reports/baseline.exit
           set -e
+          cp "$RUNNER_TEMP/baseline/reports/baseline.json" reports/baseline.json
+          node -e "const r=require('./reports/baseline.json'); if ((r.numTotalTests ?? 0) === 0) console.warn('WARNING: baseline suite ran 0 tests; check --root and setupFiles resolution')"
 
       - name: Compare failures
         shell: bash
@@ -94,7 +96,7 @@ jobs:
           HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
           node .github/scripts/baseline-diff.mjs \
-            --base-report baseline/reports/baseline.json \
+            --base-report reports/baseline.json \
             --head-report reports/head.json \
             --base-exit "$(cat reports/baseline.exit)" \
             --head-exit "$(cat reports/head.exit)" \
@@ -113,7 +115,7 @@ jobs:
             baseline-diff.md
             baseline-diff.json
             reports/head.json
-            baseline/reports/baseline.json
+            reports/baseline.json
             reports/head.exit
             reports/baseline.exit
           if-no-files-found: warn

@@ -32,6 +32,22 @@ test('readReport collects failed assertions only', () => {
   }
 })
 
+test('readReport marks a run where every suite failed to load', () => {
+  const root = mkdtempSync(join(tmpdir(), 'baseline-diff-'))
+  try {
+    const path = join(root, 'broken.json')
+    writeFileSync(path, JSON.stringify({
+      numTotalTests: 0,
+      numFailedTestSuites: 429,
+      testResults: [{ name: '/repo/tests/config/a.spec.ts', message: 'Cannot find module' }],
+    }), 'utf8')
+    const report = readReport(path, 1)
+    assert.deepEqual([...report.failures], ['__suite_load_error__:429'])
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
 test('readReport uses exit code marker for missing report', () => {
   const report = readReport('/nonexistent/vitest.json', 2)
   assert.equal(report.missing, true)
