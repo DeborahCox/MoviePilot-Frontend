@@ -414,6 +414,10 @@ html[data-theme-radius='extra'] {
 }
 
 // 统一文本输入、下拉框、文本域等有框表单控件的圆角，显式 rounded 控件保留特殊形态。
+.v-field input:is([type='number'], [type='time'], [type='date'], [type='datetime-local']) {
+  font-variant-numeric: tabular-nums;
+}
+
 .v-field:not(
   .v-field--variant-plain,
   .v-field--variant-underlined,
@@ -464,7 +468,7 @@ html[data-theme-radius='extra'] {
 
 .app-responsive-input__label {
   display: block;
-  color: rgb(var(--v-theme-on-surface));
+  color: var(--mp-fg);
   cursor: default;
   font-size: 0.9375rem;
   font-weight: 500;
@@ -474,7 +478,7 @@ html[data-theme-radius='extra'] {
 
 .app-responsive-input__hint {
   margin-block-start: 0.25rem;
-  color: rgba(var(--v-theme-on-surface), 0.56);
+  color: var(--mp-muted-fg);
   font-size: 0.75rem;
   line-height: 1.4;
   overflow-wrap: anywhere;
@@ -518,6 +522,7 @@ html[data-theme-radius='extra'] {
 .app-responsive-input--multiline .v-field {
   border-radius: var(--app-control-radius) !important;
   background-color: transparent;
+  column-gap: 0.25rem;
   transition:
     background-color 0.18s ease,
     box-shadow 0.18s ease;
@@ -528,7 +533,7 @@ html[data-theme-radius='extra'] {
 }
 
 .app-responsive-input--empty:not(:has(.v-field--dirty)) .v-field__input::placeholder {
-  color: rgba(var(--v-theme-on-surface), 0.5);
+  color: var(--mp-muted-fg);
   opacity: 1;
 }
 
@@ -623,8 +628,8 @@ html[data-theme-radius='extra'] {
 
 .app-responsive-input--field .v-field--focused,
 .app-responsive-input--multiline .v-field--focused {
-  background-color: rgba(var(--v-theme-primary), 0.08);
-  box-shadow: inset 0 0 0 1px rgba(var(--v-theme-primary), 0.2);
+  background-color: var(--mp-primary-soft);
+  box-shadow: inset 0 0 0 1px var(--mp-primary-border);
 }
 
 .app-responsive-input--multiline {
@@ -682,7 +687,7 @@ html[data-theme-radius='extra'] {
 }
 
 .app-responsive-input__native .v-field--error {
-  background-color: rgba(var(--v-theme-error), 0.08);
+  background-color: var(--mp-destructive-soft);
   box-shadow: inset 0 0 0 1px rgb(var(--v-theme-error));
 }
 
@@ -710,7 +715,7 @@ html[data-theme-radius='extra'] {
   .v-row > :is(.v-col, [class*='v-col-']) ~ :is(.v-col, [class*='v-col-']) > * > .app-responsive-input,
   .v-row + .v-row > :is(.v-col, [class*='v-col-']):first-child > .app-responsive-input,
   .v-row + .v-row > :is(.v-col, [class*='v-col-']):first-child > * > .app-responsive-input {
-    border-block-start: 1px solid rgba(var(--v-theme-on-surface), 0.08);
+    border-block-start: 1px solid var(--mp-list-row-divider);
   }
 
   // 表单顶层在桌面也占满 12 格的字段改为上下两行，避免把嵌套 md=12 字段误判为整行字段。
@@ -753,7 +758,7 @@ html[data-theme-radius='extra'] {
 @media (hover: hover) {
   .app-responsive-input--field .v-field:hover,
   .app-responsive-input--multiline .v-field:hover {
-    background-color: rgba(var(--v-theme-on-surface), 0.04);
+    background-color: var(--mp-list-row-hover);
   }
 }
 
@@ -801,23 +806,43 @@ html[data-theme] {
   }
 
   .v-chip.v-chip--variant-tonal.text-primary {
+    border: 1px solid var(--mp-primary-border) !important;
+    background-color: var(--mp-primary-soft) !important;
+    color: var(--mp-primary-fg) !important;
+  }
+
+  .v-chip.v-chip--variant-outlined.text-primary {
     color: var(--mp-primary-fg) !important;
   }
 
   .v-chip.v-chip--variant-tonal.text-error {
+    border: 1px solid var(--mp-destructive-border) !important;
+    background-color: var(--mp-destructive-soft) !important;
     color: var(--mp-destructive-fg) !important;
   }
 
   .v-chip.v-chip--variant-tonal.text-success {
+    border: 1px solid var(--mp-success-border) !important;
+    background-color: var(--mp-success-soft) !important;
     color: var(--mp-success-fg) !important;
   }
 
   .v-chip.v-chip--variant-tonal.text-warning {
+    border: 1px solid var(--mp-warning-border) !important;
+    background-color: var(--mp-warning-soft) !important;
     color: var(--mp-warning-fg) !important;
   }
 
   .v-chip.v-chip--variant-tonal.text-info {
+    border: 1px solid var(--mp-info-border) !important;
+    background-color: var(--mp-info-soft) !important;
     color: var(--mp-info-fg) !important;
+  }
+
+  // 已改用语义柔底 --mp-*-soft 时关闭 Vuetify 原生 currentColor underlay，避免双重叠加变浑。
+  .v-chip.v-chip--variant-tonal:is(.text-primary, .text-error, .text-success, .text-warning, .text-info)
+    .v-chip__underlay {
+    opacity: 0 !important;
   }
 
   .v-tab.v-tab--selected.text-primary {
@@ -1260,7 +1285,7 @@ html:where([data-glass-color-scheme='dark'], [data-theme='plain'][data-glass-col
 
   .mp-setting-card__action--danger:hover {
     background-color: var(--mp-destructive-soft, rgba(var(--v-theme-error), 0.12)) !important;
-    color: rgb(var(--v-theme-error)) !important;
+    color: var(--mp-destructive-fg) !important;
   }
 }
 
@@ -1282,25 +1307,25 @@ html:where([data-glass-color-scheme='dark'], [data-theme='plain'][data-glass-col
 .mp-setting-card__badge--success {
   border-color: var(--mp-success-border, rgba(var(--v-theme-success), 0.28));
   background: var(--mp-success-soft, rgba(var(--v-theme-success), 0.12));
-  color: rgb(var(--v-theme-success));
+  color: var(--mp-success-fg);
 }
 
 .mp-setting-card__badge--primary {
   border-color: var(--mp-primary-border, rgba(var(--v-theme-primary), 0.28));
   background: var(--mp-primary-soft, rgba(var(--v-theme-primary), 0.12));
-  color: rgb(var(--v-theme-primary));
+  color: var(--mp-primary-fg);
 }
 
 .mp-setting-card__badge--warning {
   border-color: var(--mp-warning-border, rgba(var(--v-theme-warning), 0.3));
   background: var(--mp-warning-soft, rgba(var(--v-theme-warning), 0.12));
-  color: rgb(var(--v-theme-warning));
+  color: var(--mp-warning-fg);
 }
 
 .mp-setting-card__badge--error {
   border-color: var(--mp-destructive-border, rgba(var(--v-theme-error), 0.3));
   background: var(--mp-destructive-soft, rgba(var(--v-theme-error), 0.12));
-  color: rgb(var(--v-theme-error));
+  color: var(--mp-destructive-fg);
 }
 
 .mp-setting-card__badge--accent {
@@ -1332,7 +1357,7 @@ html:where([data-glass-color-scheme='dark'], [data-theme='glass']:not([data-glas
 }
 
 .mp-setting-card__status--active {
-  color: rgb(var(--v-theme-success));
+  color: var(--mp-success-fg);
 }
 
 .mp-setting-card__status--inactive {
@@ -1406,11 +1431,11 @@ html:where([data-glass-color-scheme='dark'], [data-theme='glass']:not([data-glas
 }
 
 .mp-setting-card__stat--up .v-icon {
-  color: rgb(var(--v-theme-info));
+  color: var(--mp-info-fg);
 }
 
 .mp-setting-card__stat--down .v-icon {
-  color: rgb(var(--v-theme-success));
+  color: var(--mp-success-fg);
 }
 
 .mp-setting-card__chips {
@@ -2079,7 +2104,7 @@ html .app-table-flush-top > .v-card > .v-table {
   }
 
   .compact-fab-stack:not(:has(> :nth-child(2))) .compact-fab--primary .v-btn {
-    background-color: rgba(var(--v-theme-primary), 0.82) !important;
+    background-color: rgba(var(--v-theme-primary), 0.94) !important;
     color: rgb(var(--v-theme-on-primary)) !important;
   }
 
@@ -2354,6 +2379,173 @@ html .app-table-flush-top > .v-card > .v-table {
   padding: 0;
 }
 
+// 筛选栏与独立画布控件共享静态阅读衬底与紧凑行距，不吸顶也不叠加二层背景模糊。
+.app-filter-bar {
+  margin-block-end: 0.75rem;
+  margin-inline: 0.5rem;
+  padding-block: 0.625rem;
+  padding-inline: 0.875rem;
+  border: 1px solid var(--mp-reading-border);
+  border-radius: var(--app-theme-surface-radius);
+  background: var(--mp-reading-surface);
+}
+
+.app-filter-bar--compact {
+  display: inline-flex;
+  align-items: center;
+  max-inline-size: 100%;
+  margin-inline: 0;
+  padding-block: 0.25rem;
+  padding-inline: 0.5rem;
+}
+
+.app-filter-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-inline-size: 0;
+}
+
+.app-filter-row + .app-filter-row {
+  margin-block-start: 0.125rem;
+}
+
+.app-filter-label {
+  flex: 0 0 auto;
+  min-inline-size: 2.5rem;
+  color: var(--mp-muted-fg);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  opacity: 1;
+}
+
+.app-filter-chips {
+  flex: 1 1 0%;
+  min-inline-size: 0;
+}
+
+.app-filter-chips .v-slide-group__content {
+  padding-block: 0.125rem;
+}
+
+.app-filter-slider {
+  flex: 1 1 0%;
+  min-inline-size: 0;
+}
+
+// 直接放置于壁纸画布上的紧凑读数与状态胶囊（零 backdrop-filter 开销），保证高反差壁纸下依然清晰可读。
+.mp-canvas-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding-block: 0.1875rem;
+  padding-inline: 0.625rem;
+  border: 1px solid var(--mp-reading-border);
+  border-radius: 9999px;
+  background: var(--mp-reading-surface);
+  color: var(--mp-fg);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  line-height: 1.3;
+  white-space: nowrap;
+}
+
+@media (width <= 600px) {
+  .app-filter-bar {
+    padding-block: 0.5rem;
+    padding-inline: 0.75rem;
+  }
+
+  .app-filter-bar--compact {
+    padding-block: 0.2rem;
+    padding-inline: 0.375rem;
+  }
+
+  .app-filter-row {
+    gap: 0.5rem;
+  }
+
+  .app-filter-label {
+    min-inline-size: 2.25rem;
+  }
+}
+
 .v-menu .v-overlay__content {
   box-shadow: none;
+}
+
+// 种子促销条与资源属性标签共用语义柔和胶囊，避免高饱和纯色块在深浅平面与玻璃卡面上割裂抢眼。
+.torrent-promo {
+  border-inline-start: 1px solid var(--mp-border);
+  border-block-end: 1px solid var(--mp-border);
+  background-color: var(--mp-muted);
+  color: var(--mp-fg);
+}
+
+.torrent-promo--free {
+  border-color: var(--mp-success-border);
+  background-color: var(--mp-success-soft);
+  color: var(--mp-success-fg);
+}
+
+.torrent-promo--discount {
+  border-color: var(--mp-warning-border);
+  background-color: var(--mp-warning-soft);
+  color: var(--mp-warning-fg);
+}
+
+.torrent-promo--bonus {
+  border-color: var(--mp-primary-border);
+  background-color: var(--mp-primary-soft);
+  color: var(--mp-primary-fg);
+}
+
+.v-chip:where(
+  .chip-season,
+  .chip-web-source,
+  .chip-edition,
+  .chip-resolution,
+  .chip-codec,
+  .chip-team,
+  .chip-label,
+  .chip-hr,
+  .chip-expire,
+  .chip-free,
+  .chip-discount,
+  .chip-bonus
+) {
+  border: 1px solid var(--mp-border) !important;
+  background-color: var(--mp-muted) !important;
+  box-shadow: none !important;
+  color: var(--mp-muted-fg) !important;
+}
+
+.v-chip:where(.chip-season, .chip-edition, .chip-bonus) {
+  border-color: var(--mp-primary-border) !important;
+  background-color: var(--mp-primary-soft) !important;
+  color: var(--mp-primary-fg) !important;
+}
+
+.v-chip:where(.chip-web-source, .chip-resolution) {
+  border-color: var(--mp-info-border) !important;
+  background-color: var(--mp-info-soft) !important;
+  color: var(--mp-info-fg) !important;
+}
+
+.v-chip:where(.chip-codec, .chip-expire, .chip-discount) {
+  border-color: var(--mp-warning-border) !important;
+  background-color: var(--mp-warning-soft) !important;
+  color: var(--mp-warning-fg) !important;
+}
+
+.v-chip:where(.chip-team, .chip-free) {
+  border-color: var(--mp-success-border) !important;
+  background-color: var(--mp-success-soft) !important;
+  color: var(--mp-success-fg) !important;
+}
+
+.v-chip.chip-hr {
+  border-color: var(--mp-destructive-border) !important;
+  background-color: var(--mp-destructive-soft) !important;
+  color: var(--mp-destructive-fg) !important;
 }

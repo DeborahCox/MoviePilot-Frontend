@@ -1557,7 +1557,7 @@ onMounted(() => {
 .media-source-button--active {
   background: var(--app-grouped-list-active-background) !important;
   border-radius: var(--app-control-radius) !important;
-  color: rgb(var(--v-theme-primary)) !important;
+  color: var(--mp-primary-fg) !important;
 }
 
 .search-result-item {
@@ -1598,7 +1598,7 @@ onMounted(() => {
 }
 
 .primary-text {
-  color: rgb(var(--v-theme-primary));
+  color: var(--mp-primary-fg);
 }
 
 /* 空状态 */

@@ -1372,7 +1372,7 @@ useNativePageHeader({
           <VImg
             :src="getW500Image(mediaDetail.poster_path)"
             cover
-            class="object-cover aspect-w-2 aspect-h-3 ring-1 ring-gray-500"
+            class="media-poster-img object-cover aspect-w-2 aspect-h-3"
           >
             <template #placeholder>
               <div class="w-full h-full">
@@ -1383,12 +1383,8 @@ useNativePageHeader({
         </div>
         <div class="media-title">
           <div v-if="existsItemId" class="media-status">
-            <span
-              class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full whitespace-nowrap transition !no-underline bg-green-500 bg-opacity-80 border border-green-500 !text-green-100 hover:bg-green-500 hover:bg-opacity-100 false overflow-hidden"
-            >
-              <div class="relative z-20 flex items-center false">
-                <span>{{ t('media.status.inLibrary') }}</span>
-              </div>
+            <span class="media-status-badge">
+              <span>{{ t('media.status.inLibrary') }}</span>
             </span>
           </div>
           <h1
@@ -1398,12 +1394,12 @@ useNativePageHeader({
             <div class="align-self-center align-self-lg-end">
               {{ mediaDetail.title }}
             </div>
-            <div v-if="mediaDetail.year" class="text-lg align-self-center align-self-lg-end">
+            <div v-if="mediaDetail.year" class="num text-lg align-self-center align-self-lg-end">
               （{{ mediaDetail.year }}）
             </div>
           </h1>
           <span class="media-attributes">
-            <span v-if="mediaDetail.runtime || mediaDetail.episode_run_time[0]"
+            <span v-if="mediaDetail.runtime || mediaDetail.episode_run_time[0]" class="num"
               >{{ mediaDetail.runtime || mediaDetail.episode_run_time[0] }} {{ t('media.minutes') }}</span
             >
             <span v-if="(mediaDetail.runtime || mediaDetail.episode_run_time[0]) && mediaDetail.genres" class="mx-1">
@@ -1478,111 +1474,123 @@ useNativePageHeader({
       </div>
       <div class="media-overview">
         <div class="media-overview-left">
-          <div v-if="mediaDetail.tagline" class="tagline">
-            {{ mediaDetail.tagline }}
-          </div>
-          <h2 v-if="mediaDetail.overview">{{ t('media.overview') }}</h2>
-          <p>{{ mediaDetail.overview }}</p>
-          <ul v-if="mediaDetail.tmdb_id" class="media-crew">
-            <li v-for="director in mediaDetail.directors" :key="director.id">
-              <span>{{ director.job }}</span>
-              <RouterLink :to="`/person?source=themoviedb&personid=${director.id}`" class="crew-name" target="_blank">
-                {{ director.name }}
-              </RouterLink>
-            </li>
-          </ul>
-          <ul v-if="!mediaDetail.tmdb_id && mediaDetail.douban_id" class="media-crew">
-            <li v-for="director in mediaDetail.directors" :key="director.id">
-              <span>{{ joinArray(director.roles) }}</span>
-              <a class="crew-name" :href="`${director.url}`" target="_blank">{{ director.name }}</a>
-            </li>
-          </ul>
-          <div class="mt-6" data-testid="media-source-links">
-            <a
-              v-if="mediaDetail.tmdb_id || sharedTmdbMapping"
-              class="mb-2 mr-2 inline-flex last:mr-0"
-              :href="getTheMovieDbLink()"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              <div
-                class="media-source-link-chip inline-flex cursor-pointer items-center rounded-full border border-[var(--mp-border)] bg-[var(--mp-muted)] px-2.5 py-1 text-sm text-[var(--mp-fg)] transition hover:border-[var(--mp-input)] hover:bg-[var(--mp-list-row-hover)]"
-              >
-                <VIcon icon="mdi-link" size="16" />
-                <span class="ms-1">TheMovieDb</span>
-              </div>
-            </a>
-            <button
-              v-else-if="showTmdbLookup"
-              type="button"
-              class="mb-2 mr-2 inline-flex last:mr-0"
-              :disabled="!canLookupTmdb"
-              :aria-busy="tmdbLookupState === 'searching'"
-              @click="lookupTmdbMapping"
-            >
-              <div
-                class="media-source-link-chip inline-flex items-center rounded-full border border-[var(--mp-border)] bg-[var(--mp-muted)] px-2.5 py-1 text-sm text-[var(--mp-fg)] transition"
-                :class="
-                  canLookupTmdb
-                    ? 'cursor-pointer hover:border-[var(--mp-input)] hover:bg-[var(--mp-list-row-hover)]'
-                    : 'cursor-default opacity-70'
-                "
-              >
-                <VProgressCircular v-if="tmdbLookupState === 'searching'" indeterminate size="14" width="2" />
-                <VIcon v-else :icon="tmdbLookupIcon" size="16" />
-                <span class="ms-1">{{ tmdbLookupLabel }}</span>
-              </div>
-            </button>
-            <div v-if="mediaDetail.douban_id" class="mb-2 mr-2 inline-flex last:mr-0" @click="handleDoubanClick">
-              <div
-                class="media-source-link-chip inline-flex cursor-pointer items-center rounded-full border border-[var(--mp-border)] bg-[var(--mp-muted)] px-2.5 py-1 text-sm text-[var(--mp-fg)] transition hover:border-[var(--mp-input)] hover:bg-[var(--mp-list-row-hover)]"
-              >
-                <VIcon icon="mdi-link" size="16" />
-                <span class="ms-1">豆瓣</span>
-              </div>
+          <div class="media-overview-card">
+            <div v-if="mediaDetail.tagline" class="tagline">
+              {{ mediaDetail.tagline }}
             </div>
-            <a v-if="mediaDetail.imdb_id" class="mb-2 mr-2 inline-flex last:mr-0" :href="getImdbLink()" target="_blank">
-              <div
-                class="media-source-link-chip inline-flex cursor-pointer items-center rounded-full border border-[var(--mp-border)] bg-[var(--mp-muted)] px-2.5 py-1 text-sm text-[var(--mp-fg)] transition hover:border-[var(--mp-input)] hover:bg-[var(--mp-list-row-hover)]"
+            <h2 v-if="mediaDetail.overview">{{ t('media.overview') }}</h2>
+            <p>{{ mediaDetail.overview }}</p>
+            <ul v-if="mediaDetail.tmdb_id" class="media-crew">
+              <li v-for="director in mediaDetail.directors" :key="director.id">
+                <span>{{ director.job }}</span>
+                <RouterLink :to="`/person?source=themoviedb&personid=${director.id}`" class="crew-name" target="_blank">
+                  {{ director.name }}
+                </RouterLink>
+              </li>
+            </ul>
+            <ul v-if="!mediaDetail.tmdb_id && mediaDetail.douban_id" class="media-crew">
+              <li v-for="director in mediaDetail.directors" :key="director.id">
+                <span>{{ joinArray(director.roles) }}</span>
+                <a class="crew-name" :href="`${director.url}`" target="_blank">{{ director.name }}</a>
+              </li>
+            </ul>
+            <div class="mt-6" data-testid="media-source-links">
+              <a
+                v-if="mediaDetail.tmdb_id || sharedTmdbMapping"
+                class="mb-2 mr-2 inline-flex last:mr-0"
+                :href="getTheMovieDbLink()"
+                target="_blank"
+                rel="noopener noreferrer"
               >
-                <VIcon icon="mdi-link" size="16" />
-                <span class="ms-1">IMDb</span>
-              </div>
-            </a>
-            <a v-if="mediaDetail.tvdb_id" class="mb-2 mr-2 inline-flex last:mr-0" :href="getTvdbLink()" target="_blank">
-              <div
-                class="media-source-link-chip inline-flex cursor-pointer items-center rounded-full border border-[var(--mp-border)] bg-[var(--mp-muted)] px-2.5 py-1 text-sm text-[var(--mp-fg)] transition hover:border-[var(--mp-input)] hover:bg-[var(--mp-list-row-hover)]"
+                <div
+                  class="media-source-link-chip inline-flex cursor-pointer items-center rounded-full border border-[var(--mp-border)] bg-[var(--mp-muted)] px-2.5 py-1 text-sm text-[var(--mp-fg)] transition hover:border-[var(--mp-input)] hover:bg-[var(--mp-list-row-hover)]"
+                >
+                  <VIcon icon="mdi-link" size="16" />
+                  <span class="ms-1">TheMovieDb</span>
+                </div>
+              </a>
+              <button
+                v-else-if="showTmdbLookup"
+                type="button"
+                class="mb-2 mr-2 inline-flex last:mr-0"
+                :disabled="!canLookupTmdb"
+                :aria-busy="tmdbLookupState === 'searching'"
+                @click="lookupTmdbMapping"
               >
-                <VIcon icon="mdi-link" size="16" />
-                <span class="ms-1">TheTvDb</span>
+                <div
+                  class="media-source-link-chip inline-flex items-center rounded-full border border-[var(--mp-border)] bg-[var(--mp-muted)] px-2.5 py-1 text-sm text-[var(--mp-fg)] transition"
+                  :class="
+                    canLookupTmdb
+                      ? 'cursor-pointer hover:border-[var(--mp-input)] hover:bg-[var(--mp-list-row-hover)]'
+                      : 'cursor-default opacity-70'
+                  "
+                >
+                  <VProgressCircular v-if="tmdbLookupState === 'searching'" indeterminate size="14" width="2" />
+                  <VIcon v-else :icon="tmdbLookupIcon" size="16" />
+                  <span class="ms-1">{{ tmdbLookupLabel }}</span>
+                </div>
+              </button>
+              <div v-if="mediaDetail.douban_id" class="mb-2 mr-2 inline-flex last:mr-0" @click="handleDoubanClick">
+                <div
+                  class="media-source-link-chip inline-flex cursor-pointer items-center rounded-full border border-[var(--mp-border)] bg-[var(--mp-muted)] px-2.5 py-1 text-sm text-[var(--mp-fg)] transition hover:border-[var(--mp-input)] hover:bg-[var(--mp-list-row-hover)]"
+                >
+                  <VIcon icon="mdi-link" size="16" />
+                  <span class="ms-1">豆瓣</span>
+                </div>
               </div>
-            </a>
-            <a
-              v-if="mediaDetail.bangumi_id"
-              class="mb-2 mr-2 inline-flex last:mr-0"
-              :href="getBangumiLink()"
-              target="_blank"
-            >
-              <div
-                class="media-source-link-chip inline-flex cursor-pointer items-center rounded-full border border-[var(--mp-border)] bg-[var(--mp-muted)] px-2.5 py-1 text-sm text-[var(--mp-fg)] transition hover:border-[var(--mp-input)] hover:bg-[var(--mp-list-row-hover)]"
+              <a
+                v-if="mediaDetail.imdb_id"
+                class="mb-2 mr-2 inline-flex last:mr-0"
+                :href="getImdbLink()"
+                target="_blank"
               >
-                <VIcon icon="mdi-link" size="16" />
-                <span class="ms-1">Bangumi</span>
-              </div>
-            </a>
-            <a
-              v-if="mediaDetail.anilist_id"
-              class="mb-2 mr-2 inline-flex last:mr-0"
-              :href="getAniListLink()"
-              target="_blank"
-            >
-              <div
-                class="media-source-link-chip inline-flex cursor-pointer items-center rounded-full border border-[var(--mp-border)] bg-[var(--mp-muted)] px-2.5 py-1 text-sm text-[var(--mp-fg)] transition hover:border-[var(--mp-input)] hover:bg-[var(--mp-list-row-hover)]"
+                <div
+                  class="media-source-link-chip inline-flex cursor-pointer items-center rounded-full border border-[var(--mp-border)] bg-[var(--mp-muted)] px-2.5 py-1 text-sm text-[var(--mp-fg)] transition hover:border-[var(--mp-input)] hover:bg-[var(--mp-list-row-hover)]"
+                >
+                  <VIcon icon="mdi-link" size="16" />
+                  <span class="ms-1">IMDb</span>
+                </div>
+              </a>
+              <a
+                v-if="mediaDetail.tvdb_id"
+                class="mb-2 mr-2 inline-flex last:mr-0"
+                :href="getTvdbLink()"
+                target="_blank"
               >
-                <VIcon icon="mdi-link" size="16" />
-                <span class="ms-1">AniList</span>
-              </div>
-            </a>
+                <div
+                  class="media-source-link-chip inline-flex cursor-pointer items-center rounded-full border border-[var(--mp-border)] bg-[var(--mp-muted)] px-2.5 py-1 text-sm text-[var(--mp-fg)] transition hover:border-[var(--mp-input)] hover:bg-[var(--mp-list-row-hover)]"
+                >
+                  <VIcon icon="mdi-link" size="16" />
+                  <span class="ms-1">TheTvDb</span>
+                </div>
+              </a>
+              <a
+                v-if="mediaDetail.bangumi_id"
+                class="mb-2 mr-2 inline-flex last:mr-0"
+                :href="getBangumiLink()"
+                target="_blank"
+              >
+                <div
+                  class="media-source-link-chip inline-flex cursor-pointer items-center rounded-full border border-[var(--mp-border)] bg-[var(--mp-muted)] px-2.5 py-1 text-sm text-[var(--mp-fg)] transition hover:border-[var(--mp-input)] hover:bg-[var(--mp-list-row-hover)]"
+                >
+                  <VIcon icon="mdi-link" size="16" />
+                  <span class="ms-1">Bangumi</span>
+                </div>
+              </a>
+              <a
+                v-if="mediaDetail.anilist_id"
+                class="mb-2 mr-2 inline-flex last:mr-0"
+                :href="getAniListLink()"
+                target="_blank"
+              >
+                <div
+                  class="media-source-link-chip inline-flex cursor-pointer items-center rounded-full border border-[var(--mp-border)] bg-[var(--mp-muted)] px-2.5 py-1 text-sm text-[var(--mp-fg)] transition hover:border-[var(--mp-input)] hover:bg-[var(--mp-list-row-hover)]"
+                >
+                  <VIcon icon="mdi-link" size="16" />
+                  <span class="ms-1">AniList</span>
+                </div>
+              </a>
+            </div>
           </div>
           <h2 v-if="mediaDetail.type === '电视剧' && mediaDetail.tmdb_id" class="py-4">{{ t('media.seasons') }}</h2>
           <div v-if="mediaDetail.type === '电视剧' && mediaDetail.tmdb_id" class="flex w-full flex-col space-y-2">
@@ -1617,7 +1625,7 @@ useNativePageHeader({
                       <VIcon :icon="group.icon" size="small" class="episode-group-option__icon" />
                       <span class="episode-group-option__text">
                         <span class="episode-group-option__title">{{ group.name }}</span>
-                        <span class="episode-group-option__meta">
+                        <span class="episode-group-option__meta num">
                           {{
                             t('media.episodeGroups.summary', {
                               seasons: group.group_count,
@@ -1659,12 +1667,12 @@ useNativePageHeader({
                 <VExpansionPanelTitle>
                   <template #default>
                     <div class="flex flex-row items-center justify-between">
-                      <span class="font-weight-bold">{{
+                      <span class="font-weight-semibold">{{
                         season.season_number === 0
                           ? season.name || formatSeasonLabel(0, t('media.specials'))
                           : t('media.seasonNumber', { number: season.season_number })
                       }}</span>
-                      <VChip size="small" class="ms-1">
+                      <VChip size="small" class="num ms-1">
                         {{ t('media.episodeCount', { count: season.episode_count }) }}
                       </VChip>
                       <div class="absolute right-12">
@@ -1711,10 +1719,10 @@ useNativePageHeader({
                             size="small"
                           />
                           <div class="flex flex-col space-y-2 lg:flex-row lg:items-center lg:space-y-0 lg:space-x-2">
-                            <h3 class="text-lg">{{ episode.episode_number }} - {{ episode.name }}</h3>
+                            <h3 class="num text-lg">{{ episode.episode_number }} - {{ episode.name }}</h3>
                             <div v-if="episode.air_date" class="flex items-center space-x-2">
                               <span
-                                class="media-episode-date px-2 inline-flex text-xs leading-5 font-semibold rounded-full whitespace-nowrap cursor-default"
+                                class="media-episode-date num px-2 inline-flex text-xs leading-5 font-semibold rounded-full whitespace-nowrap cursor-default"
                               >
                                 {{ episode.air_date }}
                               </span>
@@ -2068,11 +2076,11 @@ useNativePageHeader({
             </div>
             <div v-if="mediaDetail.bangumi_id" class="media-fact">
               <span>ID</span>
-              <span class="media-fact-value">{{ mediaDetail.bangumi_id }}</span>
+              <span class="media-fact-value num">{{ mediaDetail.bangumi_id }}</span>
             </div>
             <div v-if="mediaDetail.anilist_id" class="media-fact">
               <span>ID</span>
-              <span class="media-fact-value">{{ mediaDetail.anilist_id }}</span>
+              <span class="media-fact-value num">{{ mediaDetail.anilist_id }}</span>
             </div>
             <div v-if="mediaDetail.original_title" class="media-fact">
               <span>{{ t('media.info.originalTitle') }}</span>
@@ -2080,7 +2088,7 @@ useNativePageHeader({
             </div>
             <div v-if="mediaDetail.release_date" class="media-fact border-b-0">
               <span>{{ t('media.info.releaseDate') }}</span>
-              <span class="media-fact-value">
+              <span class="media-fact-value num">
                 {{ mediaDetail.release_date }}
               </span>
             </div>
@@ -2261,7 +2269,7 @@ useNativePageHeader({
   background-size: cover;
   margin-block-start: calc(-4rem - env(safe-area-inset-top));
   margin-inline: -1rem;
-  padding-block-start: calc(4rem + env(safe-area-inset-top));
+  padding-block: calc(4rem + env(safe-area-inset-top)) var(--mp-bottom-clearance);
   padding-inline: 1rem;
 }
 
@@ -2305,13 +2313,13 @@ useNativePageHeader({
 
 .media-poster {
   overflow: hidden;
+  border: 1px solid var(--mp-border);
   border-radius: var(--app-surface-radius);
-  box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow);
+  box-shadow:
+    0 1px 3px 0 rgba(0, 0, 0, 0.1),
+    0 1px 2px -1px rgba(0, 0, 0, 0.1);
   inline-size: 8rem;
   transition: border-radius 0.2s ease;
-
-  --tw-shadow: 0 1px 3px 0 rgba(0, 0, 0, 10%), 0 1px 2px -1px rgba(0, 0, 0, 10%);
-  --tw-shadow-colored: 0 1px 3px 0 var(--tw-shadow-color), 0 1px 2px -1px var(--tw-shadow-color);
 }
 
 @media (width >= 1280px) {
@@ -2323,12 +2331,23 @@ useNativePageHeader({
 
 @media (width >= 768px) {
   .media-poster {
-    box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow);
+    box-shadow: 0 20px 40px -12px rgba(0, 0, 0, 0.24);
     inline-size: 11rem;
-
-    --tw-shadow: 0 25px 50px -12px rgba(0, 0, 0, 25%);
-    --tw-shadow-colored: 0 25px 50px -12px var(--tw-shadow-color);
   }
+}
+
+.media-status-badge {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--mp-success-border);
+  border-radius: 9999px;
+  background: var(--mp-success-soft);
+  color: var(--mp-success-fg);
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.25rem;
+  padding-inline: 0.625rem;
+  white-space: nowrap;
 }
 
 .media-title {
@@ -2349,7 +2368,7 @@ useNativePageHeader({
 
 .media-title > h1 {
   font-size: 1.5rem;
-  font-weight: 700;
+  font-weight: 600;
   line-height: 2rem;
 }
 
@@ -2358,6 +2377,35 @@ useNativePageHeader({
     font-size: 2.25rem;
     line-height: 2.5rem;
   }
+}
+
+// 浅色玻璃下媒体标题与次操作按钮可能压在深色壁纸或剧照上，补充贴合字形柔光与亮托底确保对比度。
+:global(html[data-theme='glass'][data-glass-color-scheme='light'] .media-detail-glass .media-title) {
+  text-shadow:
+    0 1px 10px rgba(255, 255, 255, 0.8),
+    0 0 22px rgba(255, 255, 255, 0.56);
+}
+
+:global(
+  html[data-theme='glass'][data-glass-color-scheme='light']
+    .media-detail-glass
+    .media-action-secondary
+    .v-btn.v-btn--variant-tonal:is(.text-primary, .text-info, .text-success)
+) {
+  border: 1px solid rgba(255, 255, 255, 0.86) !important;
+  background-color: rgba(255, 255, 255, 0.82) !important;
+}
+
+// 玻璃模式下简介与演职员块与右侧 media-facts 共享同等玻璃材质，避免直接透底导致文字压在深色壁纸上发糊。
+.media-detail-glass .media-overview-card {
+  padding: 1.25rem 1.5rem;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--app-surface-radius);
+  -webkit-backdrop-filter: var(--glass-surface-backdrop-filter);
+  backdrop-filter: var(--glass-surface-backdrop-filter);
+  background-color: var(--glass-surface);
+  background-image: var(--glass-sheen);
+  box-shadow: var(--glass-shadow);
 }
 
 ul.media-crew {
@@ -2376,7 +2424,7 @@ ul.media-crew {
 ul.media-crew > li {
   display: flex;
   flex-direction: column;
-  font-weight: 700;
+  font-weight: 600;
   grid-column: span 1 / span 1;
 }
 
@@ -2506,7 +2554,7 @@ a.crew-name {
 }
 
 .episode-group-label {
-  color: rgba(var(--v-theme-on-surface), 0.72);
+  color: var(--mp-muted-fg);
   font-size: 0.75rem;
   line-height: 1rem;
 }
@@ -2535,10 +2583,10 @@ a.crew-name {
   flex: 0 0 12rem;
   align-items: center;
   backdrop-filter: var(--app-grouped-list-backdrop-filter, blur(6px));
-  border: 1px solid rgba(var(--v-theme-on-surface), 0.12);
+  border: 1px solid var(--mp-border);
   border-radius: var(--app-control-radius);
-  background: rgba(var(--v-theme-surface), 0.82);
-  color: rgb(var(--v-theme-on-surface));
+  background: var(--mp-surface);
+  color: var(--mp-fg);
   gap: 0.625rem;
   min-inline-size: 0;
   padding-block: 0.625rem;
@@ -2552,24 +2600,24 @@ a.crew-name {
 }
 
 .episode-group-option:hover {
-  border-color: rgba(var(--v-theme-primary), 0.5);
-  background: rgba(var(--v-theme-surface), 0.9);
+  border-color: var(--mp-primary-border);
+  background: var(--mp-surface);
   box-shadow: 0 6px 18px rgba(var(--v-theme-on-surface), 0.08);
 }
 
 .episode-group-option--active {
-  border-color: rgb(var(--v-theme-primary));
-  background: rgba(var(--v-theme-primary), 0.18);
-  color: rgb(var(--v-theme-primary));
+  border-color: var(--mp-primary-border);
+  background: var(--mp-primary-soft);
+  color: var(--mp-primary-fg);
 }
 
 .episode-group-option--active:hover {
-  background: rgba(var(--v-theme-primary), 0.24);
+  background: var(--mp-primary-soft);
 }
 
 .episode-group-option:focus-visible,
 .episode-group-nav:focus-visible {
-  outline: 2px solid rgba(var(--v-theme-primary), 0.45);
+  outline: 2px solid var(--mp-ring);
   outline-offset: 2px;
 }
 
@@ -2596,13 +2644,13 @@ a.crew-name {
 }
 
 .episode-group-option__meta {
-  color: rgba(var(--v-theme-on-surface), 0.62);
+  color: var(--mp-muted-fg);
   font-size: 0.75rem;
   line-height: 1rem;
 }
 
 .episode-group-option--active .episode-group-option__meta {
-  color: rgba(var(--v-theme-primary), 0.82);
+  color: var(--mp-primary-fg);
 }
 
 .episode-group-nav {
@@ -2612,11 +2660,11 @@ a.crew-name {
   align-items: center;
   justify-content: center;
   backdrop-filter: var(--app-grouped-list-backdrop-filter, blur(6px));
-  border: 1px solid rgba(var(--v-theme-on-surface), 0.12);
+  border: 1px solid var(--mp-border);
   border-radius: 9999px;
-  background: rgba(var(--v-theme-surface), 0.96);
+  background: var(--mp-surface);
   block-size: 2.5rem;
-  color: rgb(var(--v-theme-on-surface));
+  color: var(--mp-fg);
   inline-size: 2.5rem;
   inset-block-start: 50%;
   transform: translateY(-55%);
@@ -2627,10 +2675,10 @@ a.crew-name {
 }
 
 .episode-group-nav:hover {
-  border-color: rgba(var(--v-theme-primary), 0.45);
-  background: rgba(var(--v-theme-surface), 0.96);
+  border-color: var(--mp-primary-border);
+  background: var(--mp-surface);
   box-shadow: 0 6px 18px rgba(var(--v-theme-on-surface), 0.12);
-  color: rgb(var(--v-theme-primary));
+  color: var(--mp-primary-fg);
 }
 
 .episode-group-nav--backward {
@@ -2642,7 +2690,7 @@ a.crew-name {
 }
 
 .episode-group-current {
-  color: rgba(var(--v-theme-on-surface), 0.66);
+  color: var(--mp-muted-fg);
   font-size: 0.8125rem;
   line-height: 1.25rem;
 }
@@ -2663,12 +2711,12 @@ a.crew-name {
 }
 
 .media-detail-glass .episode-group-option--active {
-  border-color: rgba(var(--v-theme-primary), 0.7);
-  background-color: rgba(var(--v-theme-primary), 0.22);
+  border-color: var(--mp-primary-border);
+  background-color: var(--mp-primary-soft);
 }
 
 .media-detail-glass .episode-group-option--active:hover {
-  background-color: rgba(var(--v-theme-primary), 0.28);
+  background-color: var(--mp-primary-soft);
 }
 
 @media (width <= 640px) {
@@ -2714,7 +2762,7 @@ a.crew-name {
   border-radius: var(--app-surface-radius);
   background-color: var(--mp-surface);
   font-size: 0.875rem;
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.25rem;
 }
 
@@ -3042,7 +3090,7 @@ a.crew-name {
 
 .media-overview h2 {
   font-size: 1.25rem;
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.75rem;
 }
 

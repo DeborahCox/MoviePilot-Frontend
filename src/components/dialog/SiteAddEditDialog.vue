@@ -107,7 +107,7 @@ async function loadDownloaderSetting() {
     const downloaders: DownloaderConf[] = await api.get('download/clients')
     downloaderOptions.value = [
       { title: t('common.default'), value: '' },
-      ...downloaders.map((item: { name: any }) => ({
+      ...downloaders.map(item => ({
         title: item.name,
         value: item.name,
       })),
@@ -186,7 +186,7 @@ onMounted(async () => {
 <template>
   <VDialog scrollable :close-on-back="false" eager max-width="45rem" :fullscreen="!display.mdAndUp.value">
     <VCard>
-      <VCardItem :class="props.oper === 'add' ? 'py-3' : 'py-2'">
+      <VCardItem :class="['pe-12', props.oper === 'add' ? 'py-3' : 'py-2']">
         <template #prepend>
           <VIcon :icon="oper == 'add' ? 'mdi-web-plus' : 'mdi-web'" class="me-2" />
         </template>
@@ -243,6 +243,7 @@ onMounted(async () => {
             <VCol cols="6" md="3">
               <VTextField
                 v-model="siteForm.timeout"
+                class="num"
                 :label="t('site.fields.timeout')"
                 :hint="t('site.hints.timeout')"
                 persistent-hint
@@ -329,6 +330,7 @@ onMounted(async () => {
             <VCol cols="12" md="4">
               <VTextField
                 v-model="siteForm.limit_interval"
+                class="num"
                 :label="t('site.fields.limitInterval')"
                 :rules="[numberValidator]"
                 :hint="t('site.hints.limitInterval')"
@@ -339,6 +341,7 @@ onMounted(async () => {
             <VCol cols="12" md="4">
               <VTextField
                 v-model="siteForm.limit_count"
+                class="num"
                 :label="t('site.fields.limitCount')"
                 :rules="[numberValidator]"
                 :hint="t('site.hints.limitCount')"
@@ -349,6 +352,7 @@ onMounted(async () => {
             <VCol cols="12" md="4">
               <VTextField
                 v-model="siteForm.limit_seconds"
+                class="num"
                 :label="t('site.fields.limitSeconds')"
                 :rules="[numberValidator]"
                 :hint="t('site.hints.limitSeconds')"
@@ -377,6 +381,7 @@ onMounted(async () => {
           </VRow>
         </VForm>
       </VCardText>
+      <VDivider />
       <VCardText class="pt-0">
         <ConnectionTestPanel :state="connectionState" />
       </VCardText>

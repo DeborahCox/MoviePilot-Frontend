@@ -137,11 +137,6 @@
       "count": 4
     }
   },
-  "src/components/dialog/SiteAddEditDialog.vue": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 1
-    }
-  },
   "src/components/dialog/SiteCookieUpdateDialog.vue": {
     "@typescript-eslint/no-explicit-any": {
       "count": 1
@@ -158,11 +153,6 @@
   "src/components/dialog/SiteStatisticsDialog.vue": {
     "@typescript-eslint/no-explicit-any": {
       "count": 1
-    }
-  },
-  "src/components/dialog/SubscribeEditDialog.vue": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 2
     }
   },
   "src/components/dialog/SubscribeHistoryDialog.vue": {
@@ -349,11 +339,6 @@
     }
   },
   "src/composables/useCardAccentColor.ts": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 1
-    }
-  },
-  "src/composables/useConfirm.ts": {
     "@typescript-eslint/no-explicit-any": {
       "count": 1
     }
@@ -549,79 +534,9 @@
       "count": 1
     }
   },
-  "src/views/discover/MediaCardSlideView.vue": {
-    "@typescript-eslint/no-unused-vars": {
-      "count": 1
-    }
-  },
   "src/views/discover/PersonCardListView.vue": {
     "@typescript-eslint/no-explicit-any": {
       "count": 2
-    }
-  },
-  "src/views/discover/PersonDetailView.vue": {
-    "no-useless-assignment": {
-      "count": 1
-    }
-  },
-  "src/views/setting/AccountSettingDirectory.vue": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 2
-    },
-    "sonarjs/super-linear-regex": {
-      "count": 1
-    }
-  },
-  "src/views/setting/AccountSettingRule.vue": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 8
-    }
-  },
-  "src/views/setting/AccountSettingSearch.vue": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 3
-    }
-  },
-  "src/views/setting/AccountSettingSite.vue": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 3
-    }
-  },
-  "src/views/setting/AccountSettingSubscribe.vue": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 3
-    }
-  },
-  "src/views/subscribe/SubscribePopularView.vue": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 1
-    },
-    "prefer-const": {
-      "count": 1
-    }
-  },
-  "src/views/subscribe/SubscribeShareView.vue": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 1
-    },
-    "prefer-const": {
-      "count": 1
-    }
-  },
-  "src/views/system/CacheView.vue": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 1
-    }
-  },
-  "src/views/system/LoggingView.vue": {
-    "@typescript-eslint/no-unused-vars": {
-      "count": 1
-    },
-    "no-control-regex": {
-      "count": 1
-    },
-    "sonarjs/super-linear-regex": {
-      "count": 8
     }
   },
   "src/views/system/ModuleTestView.vue": {
