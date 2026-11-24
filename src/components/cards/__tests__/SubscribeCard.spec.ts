@@ -1,4 +1,5 @@
 import { formatDateDifference } from '@/@core/utils/formatters'
+import { qualityOptions } from '@/api/constants'
 import type { Subscribe } from '@/api/types'
 import SubscribeCard from '@/components/cards/SubscribeCard.vue'
 import zhCN from '@/locales/zh-CN'
@@ -816,6 +817,32 @@ describe('SubscribeCard subscriber metadata', () => {
     expect(container.querySelector(selector)).toBeNull()
   })
 
+  it.each([
+    [1024, '.subscribe-card-configuration'],
+    [390, '.subscribe-card-configuration-mobile'],
+  ])('shows the mapped configuration only to administrators at %ipx', async (width, selector) => {
+    setViewport(width)
+    observeElementsImmediately()
+    const quality = qualityOptions.value[1]
+    expect(quality.title).not.toBe(quality.value)
+    const { container, media, rerender } = await renderCard(
+      { username: '管理员甲', quality: quality.value, filter: ' 中文字幕 ' },
+      { showSubscriber: true },
+    )
+
+    const line = await waitFor(() => {
+      const element = container.querySelector(selector)
+      expect(element).not.toBeNull()
+      return element as HTMLElement
+    })
+    expect(line).toHaveTextContent(quality.title)
+    expect(line).toHaveTextContent('中文字幕')
+    expect(line).not.toHaveTextContent(quality.value)
+
+    await rerender({ media, showSubscriber: false })
+    expect(container.querySelector(selector)).toBeNull()
+  })
+
   it('shows the resolved nickname and forwards both admin flags to the edit dialog', async () => {
     setViewport(1024)
     observeElementsImmediately()
@@ -1100,14 +1127,46 @@ describe('SubscribeCard completed history mode', () => {
     type: '电视剧',
   }
 
-  it('shows the completion badge and only resubscribe/delete actions', async () => {
+  it('shows the completion badge and resubscribe/delete/activity actions', async () => {
+    setViewport(1024)
+    observeElementsImmediately()
     const { container } = await renderCard(historyMedia, { isHistory: true })
 
     expect(container.querySelector('.history-complete-badge')).toBeInTheDocument()
     expect(container.querySelector('.best-version-badge')).not.toBeInTheDocument()
     expect(screen.queryByText('订阅中')).not.toBeInTheDocument()
     const menu = readNativeCardMenu(container.querySelector('.subscribe-card')!)!
-    expect(menu.items.map(item => item.title)).toEqual(['重新订阅', '删除记录'])
+    expect(menu.items.map(item => item.title)).toEqual(['重新订阅', '删除记录', '订阅活动'])
+    expect(menu.items.find(item => item.title === '订阅活动')?.icon).toBe('mdi-text-box-search-outline')
+  })
+
+  it('shows the requester and configuration on history cards for administrators', async () => {
+    setViewport(1024)
+    observeElementsImmediately()
+    const quality = qualityOptions.value[1]
+    const { container } = await renderCard(
+      { ...historyMedia, username: '历史请求者', quality: quality.value },
+      { isHistory: true, showSubscriber: true },
+    )
+
+    expect(container.querySelector('.subscribe-card-subscriber')).toHaveTextContent('历史请求者')
+    expect(container.querySelector('.subscribe-card-configuration')).toHaveTextContent(quality.title)
+  })
+
+  it('opens history activity with the history flag and never uses the active-subscription path', async () => {
+    setViewport(1024)
+    observeElementsImmediately()
+    const { container, media } = await renderCard(historyMedia, { isHistory: true })
+
+    await chooseMenuItem(container, '订阅活动')
+
+    expect(mocks.openSharedDialog).toHaveBeenCalledOnce()
+    const dialog = getDialogCall()
+    expect(dialog.props).toEqual({ subscription: media, history: true })
+    expect(dialog.options).toEqual({ closeOn: ['close'] })
+    expect(
+      mocks.openSharedDialog.mock.calls.every(([, props]) => (props as Record<string, unknown>).history === true),
+    ).toBe(true)
   })
 
   it('deletes through the history endpoint without touching the active subscription', async () => {

@@ -2,6 +2,7 @@
 import { vNativeCardMenu, nativeCardAction, type NativeCardMenuBinding } from '@/native/card'
 import { useToast } from 'vue-toastification'
 import { useConfirm } from '@/composables/useConfirm'
+import { useSubscribeConfiguration } from '@/composables/useSubscribeConfiguration'
 import { formatDateDifference } from '@/@core/utils/formatters'
 import { formatSeasonLabel } from '@/@core/utils/season'
 import api from '@/api'
@@ -113,6 +114,8 @@ const historyCompletedText = computed(() =>
 const subscriberLabel = computed(() => resolveSubscriberLabel(props.media?.username, props.source))
 const subscribedAtText = computed(() => (props.media?.date ? formatDateDifference(props.media.date) : ''))
 const showSubscriberLine = computed(() => props.showSubscriber && !!(subscriberLabel.value || subscribedAtText.value))
+// 配置方案与编辑弹窗共用同一套映射规则，仅管理员可见。
+const configurationText = useSubscribeConfiguration(() => props.media)
 
 // 用户主动搜索的状态承担短暂反馈，后台自动检查不覆盖卡片长期进度。
 const visibleExecutionStatus = ref<Subscribe['execution_status'] | null>(null)
@@ -650,6 +653,12 @@ function viewSubscribeLogs() {
   openSharedDialog(SubscribeActivityDialog, { subscription: props.media }, {}, { closeOn: ['close'] })
 }
 
+/** 历史订阅 ID 与活跃订阅无关，必须显式标记 history 才能按历史记录查询活动。 */
+function viewHistoryActivity() {
+  if (!props.media?.id) return
+  openSharedDialog(SubscribeActivityDialog, { subscription: props.media, history: true }, {}, { closeOn: ['close'] })
+}
+
 const activeDropdownItems = computed(() => [
   {
     title: t('common.edit'),
@@ -731,7 +740,7 @@ const activeDropdownItems = computed(() => [
   },
 ])
 
-// 历史记录只提供重新订阅与删除记录，任何活跃订阅操作都可能误操作同号订阅。
+// 历史记录只提供重新订阅、删除记录与订阅活动；其他活跃订阅操作都可能误操作同号订阅。
 const historyDropdownItems = computed(() => [
   {
     title: t('subscribe.resubscribe'),
@@ -750,6 +759,15 @@ const historyDropdownItems = computed(() => [
       prependIcon: 'mdi-delete',
       color: 'error',
       click: deleteHistoryRecord,
+    },
+  },
+  {
+    title: t('subscriptionActivity.title'),
+    value: 3,
+    show: true,
+    props: {
+      prependIcon: 'mdi-text-box-search-outline',
+      click: viewHistoryActivity,
     },
   },
 ])
@@ -1076,6 +1094,13 @@ function handleCardClick() {
                       <span class="min-w-0 truncate">{{ subscriberLabel }}</span>
                       <span v-if="subscribedAtText" class="flex-shrink-0 ms-2">· {{ subscribedAtText }}</span>
                     </div>
+                    <div
+                      v-if="showSubscriber"
+                      class="subscribe-card-configuration-mobile d-flex align-center text-xs text-medium-emphasis"
+                    >
+                      <VIcon icon="mdi-tune" size="11" class="flex-shrink-0 me-1" />
+                      <span class="min-w-0 truncate">{{ configurationText }}</span>
+                    </div>
                     <div class="subscribe-card-mobile-meta">
                       <div v-if="props.isHistory" class="subscribe-card-mobile-state text-start text-medium-emphasis">
                         <VIcon icon="mdi-check-circle" color="success" size="13" class="me-1" />
@@ -1264,6 +1289,10 @@ function handleCardClick() {
                     <VIcon icon="mdi-account" size="12" class="flex-shrink-0 me-1" />
                     <span class="min-w-0 truncate">{{ subscriberLabel }}</span>
                     <span v-if="subscribedAtText" class="flex-shrink-0 ms-2">· {{ subscribedAtText }}</span>
+                  </div>
+                  <div v-if="showSubscriber" class="subscribe-card-configuration d-flex align-center text-xs mt-1">
+                    <VIcon icon="mdi-tune" size="12" class="flex-shrink-0 me-1" />
+                    <span class="min-w-0 truncate">{{ configurationText }}</span>
                   </div>
                 </VCardText>
                 <div class="w-full absolute bottom-0">

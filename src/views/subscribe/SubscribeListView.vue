@@ -1212,6 +1212,7 @@ defineExpose({
           :key="item._fromHistory ? 'h-' + item.id : item.id"
           :media="item"
           :is-history="true"
+          :show-subscriber="superUser"
           @remove="fetchData"
           @save="fetchData"
         />

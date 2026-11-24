@@ -28,6 +28,7 @@ import type { DownloadDirectoryOption } from '@/utils/downloadDirectory'
 import { buildUserPermissionContext, hasPermission } from '@/utils/permission'
 import { formatDateDifference, formatSeason } from '@/@core/utils/formatters'
 import { resolveSubscriberLabel, type SubscribeSource } from '@/utils/subscribeSource'
+import { useSubscribeConfiguration } from '@/composables/useSubscribeConfiguration'
 
 // 从变更请求异常中提取可展示消息，并为非标准错误提供稳定兜底。
 function getRequestErrorMessage(error: unknown, fallback: string) {
@@ -108,27 +109,13 @@ const subscribeForm = ref<Subscribe>({
   episode_group: '',
 })
 
-// 管理员可见的订阅元数据：质量/分辨率/特效优先映射成当前语言的显示名，未收录的内部代码原样展示。
-const subscriberInfo = computed(() => {
-  const form = subscribeForm.value
-  const resolveTitle = (options: { title: string; value: string }[], value?: string) => {
-    if (!value) return ''
-    return options.find(option => option.value === value)?.title || value
-  }
-  const configuration = [
-    resolveTitle(qualityOptions.value, form.quality),
-    resolveTitle(resolutionOptions.value, form.resolution),
-    resolveTitle(effectOptions.value, form.effect),
-    form.filter?.trim() || '',
-  ]
-    .filter(Boolean)
-    .join(' + ')
-  return {
-    subscriber: resolveSubscriberLabel(form.username, props.subscriberSource),
-    subscribedAt: form.date ? formatDateDifference(form.date) : '',
-    configuration: configuration || t('dialog.subscribeEdit.noConfiguration'),
-  }
-})
+// 管理员可见的订阅元数据；配置方案与订阅卡片共用同一套映射规则。
+const configurationText = useSubscribeConfiguration(() => subscribeForm.value)
+const subscriberInfo = computed(() => ({
+  subscriber: resolveSubscriberLabel(subscribeForm.value.username, props.subscriberSource),
+  subscribedAt: subscribeForm.value.date ? formatDateDifference(subscribeForm.value.date) : '',
+  configuration: configurationText.value,
+}))
 
 // 切换为系统周期时显式提交 null，确保覆盖已保存的独立周期。
 const customSearchInterval = computed({
