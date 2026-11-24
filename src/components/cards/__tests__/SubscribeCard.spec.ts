@@ -1122,7 +1122,7 @@ describe('SubscribeCard completed history mode', () => {
     expect(emitted('save') ?? []).toHaveLength(1)
   })
 
-  it('reposts the whole record to recreate the subscription', async () => {
+  it('reposts only writable settings to recreate the subscription', async () => {
     const created = vi.fn()
     const { container, emitted, media } = await renderCard(historyMedia, { isHistory: true })
     server.use(createSubscribeHandler({ data: { id: 99 }, success: true }, 200, created))
@@ -1130,8 +1130,54 @@ describe('SubscribeCard completed history mode', () => {
     await chooseMenuItem(container, '重新订阅')
 
     await waitFor(() => expect(created).toHaveBeenCalledOnce())
-    expect(created.mock.calls[0][0]).toMatchObject({ id: media.id, name: media.name })
+    const payload = created.mock.calls[0][0]
+    expect(payload).toMatchObject({ name: media.name, year: media.year, type: media.type })
+    expect(payload).not.toHaveProperty('id')
+    expect(payload).not.toHaveProperty('date')
     expect(emitted('save') ?? []).toHaveLength(1)
+  })
+
+  it('strips the local history marker and historical fields from the resubscribe payload', async () => {
+    const created = vi.fn()
+    const { container, media } = await renderCard(
+      {
+        ...historyMedia,
+        _fromHistory: true,
+        execution_status: {
+          can_cancel: false,
+          phase: 'done',
+          state: 'completed',
+          task_id: 'old-task',
+          updated_at: '2026-08-01 12:00:00',
+        },
+        quality: '1080p',
+        resolution: '1080p',
+      } as unknown as Partial<Subscribe>,
+      { isHistory: true },
+    )
+    server.use(createSubscribeHandler({ data: { id: 100 }, success: true }, 200, created))
+
+    await chooseMenuItem(container, '重新订阅')
+
+    await waitFor(() => expect(created).toHaveBeenCalledOnce())
+    const payload = created.mock.calls[0][0]
+    expect(payload).toMatchObject({ name: media.name, quality: '1080p', resolution: '1080p' })
+    expect(payload).not.toHaveProperty('_fromHistory')
+    expect(payload).not.toHaveProperty('id')
+    expect(payload).not.toHaveProperty('date')
+    expect(payload).not.toHaveProperty('last_update')
+    expect(payload).not.toHaveProperty('state')
+    expect(payload).not.toHaveProperty('execution_status')
+  })
+
+  it('ignores a residual page_open on a history record', async () => {
+    const { media } = await renderCard(
+      { ...historyMedia, _fromHistory: true, page_open: true } as unknown as Partial<Subscribe>,
+      { isHistory: true },
+    )
+
+    expect(mocks.openSharedDialog).not.toHaveBeenCalled()
+    expect(media.page_open).toBe(true)
   })
 })
 

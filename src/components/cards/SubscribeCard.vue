@@ -443,11 +443,59 @@ async function removeSubscribe() {
   }
 }
 
-// 重新订阅：历史记录没有可用的活跃 ID，整条记录回传后端重新创建。
+// POST subscribe/ 的写入白名单，只保留用户可配置项。
+// 历史的 id/date/last_update/state/execution_status/completed_* 等属于后端写入黑名单
+// （app/schemas/subscribe.py: PUBLIC_WRITE_EXCLUDED_FIELDS），_fromHistory 则是本页本地标记；
+// 原样回传会触发 422 或用历史 id 撞活跃订阅唯一键。
+const RESUBSCRIBE_WRITABLE_FIELDS: (keyof Subscribe)[] = [
+  'name',
+  'year',
+  'type',
+  'keyword',
+  'media_source',
+  'media_id',
+  'music_type',
+  'season',
+  'search_interval',
+  'filter',
+  'include',
+  'exclude',
+  'quality',
+  'resolution',
+  'effect',
+  'audio_quality',
+  'audio_format',
+  'min_bitrate',
+  'min_bit_depth',
+  'min_sample_rate',
+  'total_tracks',
+  'total_episode',
+  'start_episode',
+  'save_path',
+  'sites',
+  'downloader',
+  'best_version',
+  'best_version_full',
+  'search_imdbid',
+  'custom_words',
+  'media_category',
+  'filter_groups',
+  'episode_group',
+]
+
+function buildResubscribePayload(source: Subscribe): Record<string, unknown> {
+  const payload: Record<string, unknown> = {}
+  for (const field of RESUBSCRIBE_WRITABLE_FIELDS) {
+    if (source[field] !== undefined) payload[field] = source[field]
+  }
+  return payload
+}
+
+// 重新订阅：历史记录没有可用的活跃 ID，只回传可配置字段供后端重新创建。
 async function reSubscribeHistory() {
   if (!props.media) return
   try {
-    await api.post('subscribe/', props.media, { feedback: 'silent' })
+    await api.post('subscribe/', buildResubscribePayload(props.media), { feedback: 'silent' })
     $toast.success(t('subscribe.addSuccess', { name: props.media.name }))
     emit('save')
   } catch (e) {
@@ -729,6 +777,8 @@ const nativeCardMenu = computed<NativeCardMenuBinding>(() => ({
 watch(
   () => props.media?.page_open,
   newOpenState => {
+    // 历史记录的 page_open 可能是残留值，不能用历史 id 打开活跃订阅编辑框。
+    if (props.isHistory) return
     if (newOpenState) editSubscribeDialog()
   },
   { immediate: true },
