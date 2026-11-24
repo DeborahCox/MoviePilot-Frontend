@@ -61,6 +61,11 @@ const props = defineProps({
   width: String,
   /** 可选卡片高度，由海报比例决定时省略。 */
   height: String,
+  /** 单一媒体类型列表可隐藏左上类型角标，避免每张海报重复显示同一分类。 */
+  hideTypeBadge: {
+    type: Boolean,
+    default: false,
+  },
 })
 
 const { t } = useI18n()
@@ -700,17 +705,17 @@ onBeforeUnmount(() => {
           <!-- 详情按实际可见状态挂载，虚拟列表重入不创建不可见的操作组件。 -->
           <VCardText
             v-if="isMediaCardDetailVisible(hover.isHovering)"
-            class="media-card-detail w-full h-full flex flex-col flex-wrap justify-end align-left absolute bottom-0 cursor-pointer pa-2"
+            class="media-card-detail w-full h-full flex flex-col justify-end absolute inset-0 cursor-pointer"
           >
-            <span class="media-card-year num">{{ props.media?.year }}</span>
-            <h1 class="media-card-title font-semibold mb-2 line-clamp-2 overflow-hidden text-ellipsis">
+            <span v-if="props.media?.year" class="media-card-year num">{{ props.media?.year }}</span>
+            <h1 class="media-card-title font-semibold line-clamp-2 overflow-hidden text-ellipsis">
               {{ props.media?.title }}
             </h1>
-            <p class="media-card-overview line-clamp-3 overflow-hidden text-ellipsis">
+            <p v-if="props.media?.overview" class="media-card-overview line-clamp-3 overflow-hidden text-ellipsis">
               {{ props.media?.overview }}
             </p>
             <div v-if="props.media?.collection_id" class="mb-3" @click.stop=""></div>
-            <div v-else class="flex align-center justify-between">
+            <div v-else-if="canSearch || canSubscribe" class="media-card-actions flex align-center justify-between">
               <IconBtn v-if="canSearch" icon="mdi-magnify" color="white" size="small" @click.stop="clickSearch" />
               <VSpacer />
               <IconBtn
@@ -724,10 +729,11 @@ onBeforeUnmount(() => {
           </VCardText>
           <!-- 类型角标 -->
           <VChip
+            v-if="!props.hideTypeBadge"
             v-show="isImageLoaded"
             variant="flat"
             size="small"
-            :class="getChipColor(props.media?.type || '')"
+            :class="[getChipColor(props.media?.type || ''), 'media-card-badge--type']"
             class="media-card-badge absolute left-2 top-2"
           >
             {{ getMediaTypeText(props.media?.type) }}
@@ -742,23 +748,29 @@ onBeforeUnmount(() => {
             :class="getChipColor('rating')"
             class="media-card-badge num absolute right-2 top-2"
           >
+            <svg class="media-card-badge__star" viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                fill="currentColor"
+                d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"
+              />
+            </svg>
             {{ formatRating(props.media?.vote_average) }}
           </VChip>
           <!--来源图标-->
           <VAvatar
-            size="24"
+            size="20"
             variant="plain"
             density="compact"
-            class="absolute bottom-1 right-1"
-            tile
+            rounded="sm"
+            class="media-card-source-avatar absolute bottom-2 right-2"
             v-if="!isMediaCardActive(hover.isHovering) && isImageLoaded && mediaSource && !imageLoadError"
           >
-            <VIcon v-if="mediaSource === 'anilist'" color="#02a9ff" icon="mdi-alpha-a-circle" size="24" />
+            <VIcon v-if="mediaSource === 'anilist'" color="#02a9ff" icon="mdi-alpha-a-circle" size="20" />
             <VIcon
               v-else-if="musicSourceIconDict[mediaSource]"
               :color="musicSourceIconDict[mediaSource].color"
               :icon="musicSourceIconDict[mediaSource].icon"
-              size="24"
+              size="20"
             />
             <VImg
               v-else
@@ -774,8 +786,11 @@ onBeforeUnmount(() => {
   </VHover>
 </template>
 <style scoped>
+/* stylelint-disable selector-pseudo-class-no-unknown */
+
 .media-card-hover-area {
   inline-size: 100%;
+  container-type: inline-size;
 }
 
 .media-card--image-loaded {
@@ -789,58 +804,191 @@ onBeforeUnmount(() => {
   inline-size: 100%;
 }
 
-.media-card-detail {
+/* 顶部预留角标安全区，关闭多列换行与全局 balance/pretty 缩行，确保窄海报内文字占满可用行宽。 */
+.v-card-text.media-card-detail {
+  overflow: hidden;
+  padding-block: 2.25rem 0.375rem;
+  padding-inline: 0.5rem;
   background: linear-gradient(
     180deg,
     rgba(11, 19, 34, 0.36) 0%,
-    rgba(11, 19, 34, 0.74) 50%,
-    rgba(11, 19, 34, 0.94) 100%
+    rgba(11, 19, 34, 0.78) 46%,
+    rgba(11, 19, 34, 0.95) 100%
   );
   color: var(--mp-on-media);
 }
 
 .media-card-year {
+  flex: 0 0 auto;
+  inline-size: 100%;
+  margin-block-end: 0.125rem;
   color: var(--mp-on-media-muted);
-  font-size: 0.8125rem;
+  font-size: 0.75rem;
   font-weight: 600;
   line-height: 1.25;
 }
 
 .media-card-title {
+  flex: 0 0 auto;
+  inline-size: 100%;
+  min-inline-size: 0;
+  margin-block: 0 0.25rem;
   color: var(--mp-on-media);
-  font-size: 1.0625rem;
+  font-size: 0.9375rem;
   line-height: 1.3;
+  overflow-wrap: anywhere;
+  text-wrap: wrap;
 }
 
 .media-card-overview {
+  flex: 0 0 auto;
+  inline-size: 100%;
+  min-inline-size: 0;
+  margin-block: 0 0.25rem;
   color: var(--mp-on-media-muted);
-  font-size: 0.8125rem;
-  line-height: 1.35;
+  font-size: 0.75rem;
+  line-height: 1.38;
+  overflow-wrap: anywhere;
+  text-wrap: wrap;
+}
+
+.media-card-actions {
+  flex: 0 0 auto;
+  inline-size: 100%;
+  margin-block-start: 0.125rem;
+}
+
+.media-card-actions :deep(.v-btn--icon) {
+  --v-btn-height: 1.25rem;
+
+  block-size: 2rem;
+  inline-size: 2rem;
+}
+
+.media-card-actions :deep(.v-btn--icon:first-child) {
+  margin-inline-start: -0.25rem;
+}
+
+.media-card-actions :deep(.v-btn--icon:last-child) {
+  margin-inline-end: -0.25rem;
 }
 
 .media-card-badge {
-  border: 1px solid rgba(248, 250, 252, 0.22);
-  -webkit-backdrop-filter: blur(8px);
-  backdrop-filter: blur(8px);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.22);
+  block-size: 1.375rem !important;
+  padding-inline: 0.4375rem !important;
+  border: 1px solid rgba(248, 250, 252, 0.14) !important;
+  border-radius: 9999px !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+  background: rgba(11, 19, 34, 0.7) !important;
+  background-image: none !important;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.22) !important;
   color: var(--mp-on-media) !important;
-  font-size: 0.75rem;
+  font-size: 0.6875rem !important;
   font-weight: 600;
+  letter-spacing: 0.01em;
 }
 
-.media-card-badge--movie {
-  background: rgba(37, 99, 235, 0.78) !important;
+.media-card-badge--type::before {
+  display: inline-block;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  block-size: 5.5px;
+  content: '';
+  inline-size: 5.5px;
+  margin-inline-end: 0.25rem;
 }
 
-.media-card-badge--tv {
-  background: rgba(79, 70, 229, 0.78) !important;
+.media-card-badge--movie::before {
+  background: var(--mp-on-media-movie);
 }
 
-.media-card-badge--music {
-  background: rgba(219, 39, 119, 0.78) !important;
+.media-card-badge--tv::before {
+  background: var(--mp-on-media-tv);
 }
 
-.media-card-badge--rating {
-  background: rgba(15, 23, 42, 0.72) !important;
+.media-card-badge--music::before {
+  background: var(--mp-on-media-music);
+}
+
+.media-card-badge__star {
+  flex: 0 0 auto;
+  block-size: 0.6875rem;
+  color: var(--mp-on-media-rating);
+  inline-size: 0.6875rem;
+  margin-inline-end: 0.2rem;
+}
+
+.media-card-source-avatar {
+  border-radius: 5px !important;
+}
+
+/* 移动端三列窄卡收敛字号、简介行数与操作钮高度，并隐藏左上类型角标防止顶角撞车。 */
+@container (width < 136px) {
+  .media-card-badge--type {
+    display: none !important;
+  }
+
+  .media-card-badge {
+    block-size: 1.25rem !important;
+    inset-block-start: 0.375rem !important;
+    inset-inline-end: 0.375rem !important;
+    padding-inline: 0.375rem !important;
+    font-size: 0.625rem !important;
+  }
+
+  .v-card-text.media-card-detail {
+    padding-block: 1.875rem 0.3125rem;
+    padding-inline: 0.4375rem;
+  }
+
+  .media-card-year {
+    margin-block-end: 0.0625rem;
+    font-size: 0.6875rem;
+    line-height: 1.2;
+  }
+
+  .media-card-title {
+    margin-block-end: 0.1875rem;
+    font-size: 0.8125rem;
+    line-height: 1.26;
+  }
+
+  .media-card-overview {
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    margin-block-end: 0.125rem;
+    font-size: 0.6875rem;
+    line-height: 1.32;
+  }
+
+  .media-card-actions {
+    margin-block-start: 0.0625rem;
+  }
+
+  .media-card-actions :deep(.v-btn--icon) {
+    --v-btn-height: 1rem;
+
+    block-size: 1.75rem;
+    inline-size: 1.75rem;
+  }
+
+  .media-card-actions :deep(.v-icon) {
+    font-size: 1.25rem !important;
+    block-size: 1.25rem !important;
+    inline-size: 1.25rem !important;
+  }
+}
+
+@container (width < 96px) {
+  .media-card-overview {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .media-card-badge {
+    background: rgb(11, 19, 34) !important;
+  }
 }
 </style>

@@ -385,6 +385,7 @@ export default {
     active: '激活',
     inactive: '未激活',
     filter: '筛选',
+    collapse: '收起',
     noMatchingData: '没有符合条件的数据',
     tryChangingFilters: '请尝试更改筛选条件',
     default: '默认',
@@ -2477,7 +2478,8 @@ export default {
     sourceHint: '默认使用后台识别设置，可为本次测试单独切换',
     customWords: '识别词',
     customWordsPlaceholder: '每行输入一组识别规则，可直接用于本次识别测试',
-    customWordsHint: '格式与"识别词管理"一致：屏蔽词 / 被替换词 => 替换词 / 前定位词 <> 后定位词 >> 集偏移量',
+    customWordsHint:
+      '格式与"识别词管理"一致：屏蔽词 / 被替换词 => 替换词 / 前定位词 <> 后定位词 >> 集偏移量；填写后默认覆盖全局识别词，单独一行 {\'@global\'} 可引入全局识别词',
     saveWords: '保存识别词',
     saveWordsSuccess: '识别词已保存到识别词表末尾',
     saveWordsNoChange: '识别词已存在，无需重复保存',
@@ -3876,6 +3878,9 @@ export default {
       ocrHostHint: '用于站点签到、更新站点Cookie等识别验证码',
       flaresolverrUrl: 'FlareSolverr 服务地址',
       flaresolverrUrlHint: '当仿真方式为 FlareSolverr 时生效，例如：http://127.0.0.1:8191',
+      siteUserAgent: '站点默认User-Agent',
+      siteUserAgentPlaceholder: '留空则使用系统默认User-Agent',
+      siteUserAgentHint: '站点未单独配置User-Agent时使用此通用配置，留空则使用系统默认值',
       siteDataRefreshInterval: '站点数据刷新间隔',
       siteDataRefreshIntervalHint: '刷新站点用户上传下载等数据的时间间隔',
       searchResourcePages: '搜索资源获取页数',
@@ -5150,9 +5155,10 @@ export default {
       mediaCategory: '自定义类别',
       mediaCategoryHint: '指定类别名称，留空自动识别',
       customWords: '自定义识别词',
-      customWordsHint: '只对该订阅使用的识别词',
+      customWordsHint:
+        "只对该订阅使用的识别词，填写后默认覆盖全局识别词；单独添加一行 {'@global'} 可在该位置引入全局识别词",
       customWordsPlaceholder:
-        '屏蔽词\n被替换词 => 替换词\n前定位词 <> 后定位词 >> 集偏移量（EP）\n被替换词 => 替换词 && 前定位词 <> 后定位词 >> 集偏移量（EP）\n其中替换词支持格式：&#123;[tmdbid/doubanid/bangumiid/anilistid=xxx;type=movie/tv;g=xxx;s=xxx;e=xxx]&#125; 直接指定媒体数据源ID识别，其中g为剧集组编号，s、e为季数和集数（均可选）',
+        "{'@global'}\n屏蔽词\n被替换词 => 替换词\n前定位词 <> 后定位词 >> 集偏移量（EP）\n被替换词 => 替换词 && 前定位词 <> 后定位词 >> 集偏移量（EP）\n其中 {'@global'} 表示在当前位置引入全局自定义识别词；替换词支持格式：&#123;[tmdbid/doubanid/bangumiid/anilistid=xxx;type=movie/tv;g=xxx;s=xxx;e=xxx]&#125; 直接指定媒体数据源ID识别，其中g为剧集组编号，s、e为季数和集数（均可选）",
       cancelSubscribe: '取消订阅',
       save: '保存',
       cancelSubscribeConfirm: '是否确认取消订阅？',
@@ -6146,6 +6152,7 @@ export default {
     language: '语言',
     rating: '评分',
     year: '年代',
+    voteCount: '人数',
     sortType: {
       popularityDesc: '热度降序',
       popularityAsc: '热度升序',

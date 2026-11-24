@@ -18,6 +18,7 @@ const LEGACY_RAW_SEMANTIC_FG_ALLOWLIST = new Set([
 
 const RAW_SEMANTIC_FG_PATTERN = /(?<![-\w])color\s*:\s*rgb\(var\(--v-theme-(primary|success|info|warning|error)\)\)/gu
 const SURFACE_CONTAINER_TAGS = new Set([
+  'AppFilterBar',
   'VCard',
   'VDialog',
   'VMenu',
@@ -149,5 +150,59 @@ describe('跨主题可读性与玻璃表面契约守卫', () => {
     }
 
     expect(nakedViews).toEqual([])
+  })
+
+  it('探索与订阅筛选视图的 VChip 统一使用满圆胶囊，不得回退为 tile 直角或单选 filter 勾选号', () => {
+    const filterViews = [
+      'src/views/discover/AniListView.vue',
+      'src/views/discover/BangumiView.vue',
+      'src/views/discover/DoubanView.vue',
+      'src/views/discover/MusicView.vue',
+      'src/views/discover/TheMovieDbView.vue',
+      'src/views/subscribe/SubscribePopularView.vue',
+      'src/views/subscribe/SubscribeShareView.vue',
+    ]
+
+    const violations: string[] = []
+    for (const file of filterViews) {
+      const content = readFileSync(resolve(root, file), 'utf8')
+      const openIdx = content.indexOf('<template')
+      const closeIdx = content.lastIndexOf('</template>')
+      const template = openIdx >= 0 && closeIdx > openIdx ? content.slice(openIdx, closeIdx) : content
+      for (const chipMatch of template.matchAll(/<VChip\b([^>]*)>/gu)) {
+        const attrs = chipMatch[1]
+        if (/(?:^|\s)(?:tile|filter)(?:\s|\/|$)/u.test(attrs)) {
+          violations.push(`${file}: ${chipMatch[0]}`)
+        }
+      }
+    }
+
+    expect(violations).toEqual([])
+  })
+
+  it('降低透明度模式下深浅玻璃筛选微胶囊均回退至实心表面色 rgb(var(--mp-surface-rgb))', () => {
+    const commonScss = readFileSync(resolve(root, 'src/styles/common.scss'), 'utf8')
+    const reducedStart = commonScss.indexOf('@media (prefers-reduced-transparency: reduce)')
+    expect(reducedStart).toBeGreaterThanOrEqual(0)
+    const reducedBlock = commonScss.slice(reducedStart)
+    expect(reducedBlock).toContain("html[data-theme='glass']")
+    expect(reducedBlock).toContain("html[data-theme='glass'][data-glass-color-scheme='light']")
+    expect(reducedBlock).toContain('--mp-filter-pill-bg: rgb(var(--mp-surface-rgb));')
+  })
+
+  it('海报与剧照卡片详情层预留顶部徽章安全区，并显式关闭 balance/pretty 缩行与全局段落底距', () => {
+    const mediaCardSource = readFileSync(resolve(root, 'src/components/cards/MediaCard.vue'), 'utf8')
+    expect(mediaCardSource).toMatch(/\.v-card-text\.media-card-detail\s*\{[\s\S]*?padding-block:\s*2\.25rem/u)
+    expect(mediaCardSource).toMatch(/\.media-card-title\s*\{[\s\S]*?text-wrap:\s*wrap;/u)
+    expect(mediaCardSource).toMatch(
+      /\.media-card-overview\s*\{[\s\S]*?margin-block:\s*0\s+0\.25rem;[\s\S]*?text-wrap:\s*wrap;/u,
+    )
+    expect(mediaCardSource).toMatch(
+      /@container\s*\(width\s*<\s*136px\)\s*\{[\s\S]*?\.v-card-text\.media-card-detail[\s\S]*?-webkit-line-clamp:\s*2;/u,
+    )
+
+    const posterCardSource = readFileSync(resolve(root, 'src/components/cards/PosterCard.vue'), 'utf8')
+    expect(posterCardSource).toMatch(/\.v-card-text\.poster-card-detail\s*\{[\s\S]*?padding-block:\s*2\.25rem/u)
+    expect(posterCardSource).toMatch(/\.poster-card-title\s*\{[\s\S]*?text-wrap:\s*wrap;/u)
   })
 })
