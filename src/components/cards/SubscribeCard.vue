@@ -70,6 +70,11 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  // 历史订阅：ID 与活跃订阅无关，只提供重新订阅与删除记录
+  isHistory: {
+    type: Boolean,
+    default: false,
+  },
 })
 
 // 从 provide 中获取全局设置
@@ -98,6 +103,11 @@ const subscribeState = ref<string>(props.media?.state ?? 'P')
 
 // 上一次更新时间
 const lastUpdateText = computed(() => (props.media?.last_update ? formatDateDifference(props.media.last_update) : ''))
+
+// 历史订阅的 date 是完成时间；活跃订阅仍用 last_update 展示最近更新。
+const historyCompletedText = computed(() =>
+  props.isHistory && props.media?.date ? formatDateDifference(props.media.date) : '',
+)
 
 // 管理员可见：订阅者与订阅时间；账号来源有昵称时优先展示昵称。
 const subscriberLabel = computed(() => resolveSubscriberLabel(props.media?.username, props.source))
@@ -183,7 +193,9 @@ const executionStateDisplay = computed(() => {
 })
 
 // 批量选择和排序模式保留整卡原有操作，不让执行详情抢占点击。
-const canOpenExecutionDetails = computed(() => !!executionStateDisplay.value && !props.batchMode && !props.sortable)
+const canOpenExecutionDetails = computed(
+  () => !!executionStateDisplay.value && !props.batchMode && !props.sortable && !props.isHistory,
+)
 
 /** 从鼠标、触屏或键盘打开执行详情，阻止同时触发订阅编辑。 */
 function openExecutionDetails(event: Event) {
@@ -210,6 +222,8 @@ const isMusicAlbumSubscribe = computed(() => {
 
 // 电视剧和专辑共用卡片进度展示，但两者的完成事实分别由后端派生。
 const hasSubscribeProgress = computed(() => {
+  // 历史记录没有进行中的进度，旧字段即使有值也不再展示。
+  if (props.isHistory) return false
   const totalEpisode = props.media?.total_episode || 0
   return totalEpisode > 0 || isMusicAlbumSubscribe.value
 })
@@ -228,6 +242,7 @@ const hasBestVersion = computed(() => isEnabledFlag(props.media?.best_version))
 const isBestVersion = computed(() => hasBestVersion.value && isTvSubscribe(props.media))
 
 const rightBottomStateDisplay = computed(() => {
+  if (props.isHistory) return null
   if (executionStateDisplay.value) {
     return executionStateDisplay.value
   }
@@ -259,7 +274,7 @@ const compactStateDisplay = computed(() => {
 
 // 洗版徽标：共用 mdi-quality-high 图标，分集 / 全集 由 full 标记区分背景
 const bestVersionBadge = computed(() => {
-  if (!hasBestVersion.value) return null
+  if (props.isHistory || !hasBestVersion.value) return null
   return {
     icon: 'mdi-quality-high',
     full: isEnabledFlag(props.media?.best_version_full),
@@ -298,7 +313,7 @@ const subscribeProgressText = computed(() => {
 
 // 音乐订阅始终展示实体类型；旧数据缺少 music_type 时按既有单曲语义兼容。
 const musicSubscribeMeta = computed(() => {
-  if (props.media?.type !== '音乐') return null
+  if (props.isHistory || props.media?.type !== '音乐') return null
   const currentSpecs = formatMusicAudioSpecs({
     audio_format: props.media.current_audio_format,
     bit_depth: props.media.current_bit_depth,
@@ -355,7 +370,7 @@ const isCompactNumericProgress = computed(() => !executionStateDisplay.value && 
 
 // 手机底座右侧辅助元信息：有进度展示百分比，无进度且非音乐展示年份，平衡原生隐藏三点菜单后的留白。
 const mobileTrailingMetaText = computed(() => {
-  if (executionStateDisplay.value) return ''
+  if (props.isHistory || executionStateDisplay.value) return ''
   if (hasSubscribeProgress.value) return `${getPercentage()}%`
   if (musicSubscribeMeta.value) return ''
   return props.media?.year ? String(props.media.year).trim() : ''
@@ -422,6 +437,31 @@ async function removeSubscribe() {
     await api.delete(`subscribe/${props.media?.id}`, { feedback: 'silent' })
     // 通知父组件刷新
     emit('remove')
+  } catch (e) {
+    $toast.error(t('subscribe.requestFailed'))
+    console.log(e)
+  }
+}
+
+// 重新订阅：历史记录没有可用的活跃 ID，整条记录回传后端重新创建。
+async function reSubscribeHistory() {
+  if (!props.media) return
+  try {
+    await api.post('subscribe/', props.media, { feedback: 'silent' })
+    $toast.success(t('subscribe.addSuccess', { name: props.media.name }))
+    emit('save')
+  } catch (e) {
+    $toast.error(t('subscribe.requestFailed'))
+    console.log(e)
+  }
+}
+
+// 删除历史记录：只走历史端点，绝不触碰同号的活跃订阅。
+async function deleteHistoryRecord() {
+  if (!props.media?.id) return
+  try {
+    await api.delete(`subscribe/history/${props.media.id}`, { feedback: 'silent' })
+    emit('save')
   } catch (e) {
     $toast.error(t('subscribe.requestFailed'))
     console.log(e)
@@ -562,7 +602,7 @@ function viewSubscribeLogs() {
   openSharedDialog(SubscribeActivityDialog, { subscription: props.media }, {}, { closeOn: ['close'] })
 }
 
-const dropdownItems = computed(() => [
+const activeDropdownItems = computed(() => [
   {
     title: t('common.edit'),
     value: 1,
@@ -643,9 +683,34 @@ const dropdownItems = computed(() => [
   },
 ])
 
+// 历史记录只提供重新订阅与删除记录，任何活跃订阅操作都可能误操作同号订阅。
+const historyDropdownItems = computed(() => [
+  {
+    title: t('subscribe.resubscribe'),
+    value: 1,
+    show: true,
+    props: {
+      prependIcon: 'mdi-redo',
+      click: reSubscribeHistory,
+    },
+  },
+  {
+    title: t('subscribe.deleteHistory'),
+    value: 2,
+    show: true,
+    props: {
+      prependIcon: 'mdi-delete',
+      color: 'error',
+      click: deleteHistoryRecord,
+    },
+  },
+])
+
+const dropdownItems = computed(() => (props.isHistory ? historyDropdownItems.value : activeDropdownItems.value))
+
 /** 桌面和移动菜单共享同一订阅来源；批量选择或排序时不触发原生操作。 */
 const nativeCardMenu = computed<NativeCardMenuBinding>(() => ({
-  key: props.media?.id,
+  key: props.isHistory ? `h-${props.media?.id}` : props.media?.id,
   title: props.media?.name,
   available: () => !props.sortable && !props.batchMode,
   items: () =>
@@ -780,7 +845,8 @@ function onSubscribeEditRemove() {
 
 // 处理卡片点击事件
 function handleCardClick() {
-  if (props.sortable) {
+  // 历史卡片不可编辑，点击不触发任何活跃订阅操作。
+  if (props.isHistory || props.sortable) {
     return
   }
 
@@ -809,7 +875,7 @@ function handleCardClick() {
           >
             <VCard
               v-native-card-menu="nativeCardMenu"
-              :key="props.media?.id"
+              :key="props.isHistory ? `h-${props.media?.id}` : props.media?.id"
               class="subscribe-card flex flex-col h-full overflow-hidden"
               :class="{
                 'subscribe-card-paused': subscribeState === 'S',
@@ -821,7 +887,7 @@ function handleCardClick() {
               :style="display.smAndUp.value ? desktopToneStyle : undefined"
               min-height="150"
               @click="handleCardClick"
-              :ripple="display.smAndUp.value && !props.batchMode && !props.sortable"
+              :ripple="display.smAndUp.value && !props.batchMode && !props.sortable && !props.isHistory"
             >
               <div
                 v-if="bestVersionBadge && imageLoaded && display.smAndUp.value"
@@ -829,6 +895,14 @@ function handleCardClick() {
                 :class="{ 'best-version-badge-full': bestVersionBadge.full }"
               >
                 <VIcon :icon="bestVersionBadge.icon" color="white" size="16" />
+              </div>
+              <!-- 历史完成角标与洗版徽标互斥，固定在同一左上角位置 -->
+              <div
+                v-if="props.isHistory"
+                class="history-complete-badge"
+                :aria-label="t('subscribe.completedHistory')"
+              >
+                <VIcon icon="mdi-check" color="white" size="16" />
               </div>
               <div v-if="!props.sortable && display.smAndUp.value" class="me-n3 absolute top-1 right-4">
                 <IconBtn data-native-card-menu-trigger :aria-label="t('nav.more')" @click.stop>
@@ -903,7 +977,10 @@ function handleCardClick() {
                   </VImg>
                   <div class="subscribe-card-mobile-image-scrim subscribe-card-background"></div>
 
-                  <div v-if="props.source || lastUpdateText" class="subscribe-card-mobile-image-meta">
+                  <div
+                    v-if="props.source || lastUpdateText || historyCompletedText"
+                    class="subscribe-card-mobile-image-meta"
+                  >
                     <!-- 来源只放头像徽标在左上角，与右上角更新时间胶囊对称 -->
                     <SubscribeSourceMark
                       v-if="props.source"
@@ -911,7 +988,14 @@ function handleCardClick() {
                       class="subscribe-card-mobile-image-meta__item subscribe-card-mobile-image-meta__source"
                     />
                     <div
-                      v-if="lastUpdateText"
+                      v-if="historyCompletedText"
+                      class="subscribe-card-mobile-image-meta__item subscribe-card-mobile-image-meta__updated"
+                    >
+                      <VIcon icon="mdi-check-circle" color="success" size="11" />
+                      <span>{{ historyCompletedText }}</span>
+                    </div>
+                    <div
+                      v-else-if="lastUpdateText"
                       class="subscribe-card-mobile-image-meta__item subscribe-card-mobile-image-meta__updated"
                     >
                       <VIcon icon="mdi-download" size="11" />
@@ -943,7 +1027,12 @@ function handleCardClick() {
                       <span v-if="subscribedAtText" class="flex-shrink-0 ms-2">· {{ subscribedAtText }}</span>
                     </div>
                     <div class="subscribe-card-mobile-meta">
+                      <div v-if="props.isHistory" class="subscribe-card-mobile-state text-start text-medium-emphasis">
+                        <VIcon icon="mdi-check-circle" color="success" size="13" class="me-1" />
+                        <span>{{ historyCompletedText }}</span>
+                      </div>
                       <component
+                        v-else
                         :is="canOpenExecutionDetails ? 'button' : 'div'"
                         :type="canOpenExecutionDetails ? 'button' : undefined"
                         class="subscribe-card-mobile-state text-start"
@@ -970,7 +1059,7 @@ function handleCardClick() {
                         </span>
                       </component>
 
-                      <span v-if="mobileTrailingMetaText" class="subscribe-card-mobile-trailing-meta">
+                      <span v-if="!props.isHistory && mobileTrailingMetaText" class="subscribe-card-mobile-trailing-meta">
                         {{ mobileTrailingMetaText }}
                       </span>
 
@@ -1113,6 +1202,13 @@ function handleCardClick() {
                       <VIcon icon="mdi-download" class="me-1" />
                       {{ lastUpdateText }}
                     </div>
+                    <div
+                      v-else-if="historyCompletedText"
+                      class="subscribe-card-footer-meta d-flex flex-shrink-0 align-center text-xs"
+                    >
+                      <VIcon icon="mdi-check-circle" color="success" class="me-1" />
+                      {{ historyCompletedText }}
+                    </div>
                   </div>
                   <div v-if="showSubscriberLine" class="subscribe-card-subscriber d-flex align-center text-xs mt-1">
                     <VIcon icon="mdi-account" size="12" class="flex-shrink-0 me-1" />
@@ -1126,7 +1222,7 @@ function handleCardClick() {
                   形成两段语义；其余订阅维持原有单段进度条
                 -->
                   <VProgressLinear
-                    v-if="isBestVersion && getBufferPercentage() > 0"
+                    v-if="!props.isHistory && isBestVersion && getBufferPercentage() > 0"
                     :model-value="getPercentage()"
                     :buffer-value="getBufferPercentage()"
                     bg-color="success"
@@ -1136,7 +1232,7 @@ function handleCardClick() {
                     buffer-opacity="0.55"
                   />
                   <VProgressLinear
-                    v-else-if="getPercentage() > 0"
+                    v-else-if="!props.isHistory && getPercentage() > 0"
                     :model-value="getPercentage()"
                     bg-color="success"
                     color="success"
@@ -1632,6 +1728,22 @@ button.subscribe-card-mobile-state:active {
   backdrop-filter: blur(10px);
   background: rgba(255, 255, 255, 22%);
   box-shadow: 0 2px 8px rgba(255, 255, 255, 15%);
+}
+
+/** 历史完成角标：与洗版徽标共用左上角圆形规格，但使用成功色实心底。 */
+.history-complete-badge {
+  position: absolute;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: rgb(var(--v-theme-success));
+  block-size: 24px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 50%);
+  inline-size: 24px;
+  inset-block-start: 6px;
+  inset-inline-start: 8px;
 }
 
 @media (width <= 599px) {

@@ -1889,6 +1889,9 @@ export default {
     cancelFailed: 'Failed to cancel subscription: {message}!',
     notFound: 'Subscription not found!',
     requestFailed: 'Request failed. Please try again later.',
+    completedHistory: 'Completed history',
+    resubscribe: 'Resubscribe',
+    deleteHistory: 'Delete record',
     native: {
       invalidMedia: 'Unable to open native subscription: invalid media information.',
       missingId: 'Unable to open native subscription: provide a valid media source ID.',

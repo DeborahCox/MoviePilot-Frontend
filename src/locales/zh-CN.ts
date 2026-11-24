@@ -1855,6 +1855,9 @@ export default {
     cancelFailed: '取消订阅失败：{message}！',
     notFound: '订阅不存在！',
     requestFailed: '请求失败，请稍后重试',
+    completedHistory: '已完成的历史',
+    resubscribe: '重新订阅',
+    deleteHistory: '删除记录',
     native: {
       invalidMedia: '无法打开原生订阅：媒体信息格式无效。',
       missingId: '无法打开原生订阅：请提供有效的媒体数据源 ID。',

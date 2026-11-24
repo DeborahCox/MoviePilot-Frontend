@@ -9,6 +9,7 @@ import {
   cancelSubscriptionExecutionBatchHandler,
   saveSubscribeOrderConfigHandler,
   subscribeApiUrls,
+  subscribeHistoryHandler,
   subscribeListHandler,
   subscriptionExecutionBatchesHandler,
   subscribeOrderConfigHandler,
@@ -53,6 +54,7 @@ const SubscribeCardStub = defineComponent({
   name: 'SubscribeCard',
   props: {
     batchMode: Boolean,
+    isHistory: Boolean,
     media: { type: Object as PropType<Subscribe>, required: true },
     selected: Boolean,
     sortable: Boolean,
@@ -68,8 +70,9 @@ const SubscribeCardStub = defineComponent({
           'data-page-open': String(Boolean(props.media.page_open)),
           'data-selected': String(props.selected),
           'data-sortable': String(props.sortable),
+          'data-history': String(props.isHistory),
           'data-source': props.source ? `${props.source.kind}:${props.source.label}` : '',
-          'data-testid': `subscribe-card-${props.media.id}`,
+          'data-testid': `subscribe-card-${props.isHistory ? 'h-' : ''}${props.media.id}`,
         },
         [
           h('span', props.media.name),
@@ -232,6 +235,8 @@ interface RenderListOptions {
     SubscriptionBatchStatus[] | ((url: URL) => SubscriptionBatchStatus[] | Promise<SubscriptionBatchStatus[]>)
   batchStatus?: number
   onBatchRequest?: (url: URL) => void
+  historyResponse?: Subscribe[]
+  onHistoryRequest?: (url: URL) => void
   keyword?: string
   listResponse?: Subscribe[] | ((url: URL) => Subscribe[] | Promise<Subscribe[]>)
   listStatus?: number
@@ -256,6 +261,7 @@ async function renderList(options: RenderListOptions = {}) {
   server.use(
     subscribeOrderConfigHandler(type, options.orderValue, options.orderStatus ?? 200, options.onOrderRequest),
     subscribeListHandler(options.listResponse ?? [], options.listStatus ?? 200, options.onListRequest),
+    subscribeHistoryHandler(type, options.historyResponse ?? [], 200, options.onHistoryRequest ?? (() => {})),
     subscriptionExecutionBatchesHandler(
       options.batchResponse ?? [],
       options.batchStatus ?? 200,
@@ -386,6 +392,24 @@ describe('SubscribeListView loading and filtering', () => {
     expect(orderRequested.mock.calls[0][0].href).toBe(subscribeApiUrls.orderConfig('电影'))
     expect(listRequested.mock.calls[0][0].href).toBe(subscribeApiUrls.list)
     expect(screen.getByTestId('sort-by-state')).toHaveTextContent('date')
+  })
+
+  it('renders active and completed history together with collision-proof keys', async () => {
+    const historyRequested = vi.fn()
+    await renderList({
+      listResponse: [movie(1, 'Active movie')],
+      historyResponse: [movie(1, 'Finished movie', { date: '2026-08-01T00:00:00+00:00' })],
+      onHistoryRequest: historyRequested,
+    })
+
+    expect(await screen.findByText('Active movie')).toBeInTheDocument()
+    expect(await screen.findByText('Finished movie')).toBeInTheDocument()
+    expect(screen.getByTestId('subscribe-card-1')).toHaveAttribute('data-history', 'false')
+    expect(screen.getByTestId('subscribe-card-h-1')).toHaveAttribute('data-history', 'true')
+    expect(historyRequested.mock.calls[0][0].href).toContain(subscribeApiUrls.historyByType('电影'))
+    expect(historyRequested.mock.calls[0][0].searchParams.get('page')).toBe('1')
+    expect(historyRequested.mock.calls[0][0].searchParams.get('count')).toBe('30')
+    expect(screen.getByText(/已完成的历史/)).toBeInTheDocument()
   })
 
   it('shows batch progress and sends cancellation to the stable batch endpoint', async () => {

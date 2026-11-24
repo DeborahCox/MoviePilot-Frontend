@@ -99,8 +99,16 @@ let lastSubscriptionRequestAt = Number.NEGATIVE_INFINITY
 let subscriptionRequest: Promise<void> | undefined
 let pendingSubscriptionRefreshContext: KeepAliveRefreshContext | undefined
 
-// 数据列表
+// 数据列表（仅活跃订阅；历史记录单独存放，避免同名 id 混用）
 const dataList = ref<Subscribe[]>([])
+
+// 历史记录带本地来源标记，渲染时用复合 key 与活跃订阅隔离
+type SubscribeWithOrigin = Subscribe & { _fromHistory?: boolean }
+const historyList = ref<SubscribeWithOrigin[]>([])
+const historyPage = ref(1)
+const historyHasMore = ref(true)
+const historyLoading = ref(false)
+const HISTORY_PAGE_SIZE = 30
 
 // 最近批次用于展示聚合进度；订阅级状态仍由卡片各自渲染。
 const executionBatches = ref<SubscriptionBatchStatus[]>([])
@@ -316,7 +324,7 @@ const sortMode = computed({
 })
 const canDragSort = computed(() => sortMode.value && canSortContext.value)
 const shouldVirtualizeList = computed(() => !canDragSort.value)
-const subscribeGridMinItemWidth = computed(() => (display.xs.value ? 144 : 240))
+const subscribeGridMinItemWidth = computed(() => (display.xs.value ? 144 : 320))
 const subscribeGridEstimatedItemHeight = computed(() => (display.xs.value ? 190 : 300))
 const subscribeGridGap = computed(() => (display.xs.value ? 12 : 16))
 const scrollToIndex = computed(() => {
@@ -515,11 +523,51 @@ async function saveSubscribeOrder() {
   }
 }
 
+// 历史记录独立加载：失败只影响历史区块，不覆盖活跃订阅列表。
+async function requestHistory({ reset = true } = {}) {
+  if (historyLoading.value || (!reset && !historyHasMore.value)) return
+  if (!props.type) return
+
+  historyLoading.value = true
+  if (reset) {
+    historyPage.value = 1
+    historyHasMore.value = true
+  }
+  try {
+    const pageData = await api.get<Subscribe[]>(`subscribe/history/${props.type}`, {
+      params: { page: historyPage.value, count: HISTORY_PAGE_SIZE },
+      feedback: 'silent',
+    })
+    const nextItems = pageData.map(item => ({ ...item, _fromHistory: true }))
+    if (reset) {
+      historyList.value = nextItems
+    } else {
+      const existing = new Set(historyList.value.map(item => item.id))
+      historyList.value = [...historyList.value, ...nextItems.filter(item => !existing.has(item.id))]
+    }
+    historyHasMore.value = pageData.length === HISTORY_PAGE_SIZE
+    historyPage.value++
+  } catch (error) {
+    if (isCancelledRequest(error)) return
+    console.error(error)
+    if (reset) historyList.value = []
+  } finally {
+    historyLoading.value = false
+  }
+}
+
+function loadMoreHistory() {
+  void requestHistory({ reset: false })
+}
+
 // 获取订阅列表；批次状态使用独立错误边界，不参与列表成功判定。
 async function requestSubscriptions(context: KeepAliveRefreshContext = {}) {
   const showLoading = !context.silent || !isRefreshed.value
   const isInitialLoad = !isRefreshed.value
   lastSubscriptionRequestAt = Date.now()
+
+  // 历史只在首次或显式刷新时重载；15 秒静默轮询不得清掉已加载的分页。
+  if (isInitialLoad || context.silent !== true) void requestHistory()
 
   try {
     if (showLoading) {
@@ -1142,4 +1190,37 @@ defineExpose({
     :error-title="errorTitle"
     :error-description="errorDescription"
   />
+
+  <!-- 已完成的历史：与活跃订阅上下并列，不参与批量选择与排序 -->
+  <template v-if="historyList.length > 0">
+    <div class="d-flex align-center ga-2 mt-8 mb-3 px-2">
+      <VIcon icon="mdi-history" size="18" color="success" />
+      <span class="text-subtitle-2 font-weight-medium">{{ t('subscribe.completedHistory') }}</span>
+      <span class="text-caption text-medium-emphasis">({{ historyList.length }})</span>
+      <VDivider class="flex-grow-1" />
+    </div>
+    <ProgressiveCardGrid
+      :items="historyList"
+      :get-item-key="item => (item._fromHistory ? 'h-' + item.id : String(item.id))"
+      :min-item-width="subscribeGridMinItemWidth"
+      :estimated-item-height="subscribeGridEstimatedItemHeight"
+      :gap="subscribeGridGap"
+      class="px-2"
+    >
+      <template #default="{ item }">
+        <SubscribeCard
+          :key="item._fromHistory ? 'h-' + item.id : item.id"
+          :media="item"
+          :is-history="true"
+          @remove="fetchData"
+          @save="fetchData"
+        />
+      </template>
+    </ProgressiveCardGrid>
+    <div v-if="historyHasMore" class="d-flex justify-center mt-4">
+      <VBtn variant="tonal" size="small" :loading="historyLoading" @click="loadMoreHistory">
+        {{ t('common.loadMore') }}
+      </VBtn>
+    </div>
+  </template>
 </template>

@@ -6,9 +6,12 @@ import zhTW from '@/locales/zh-TW'
 import { fireEvent, screen, waitFor } from '@testing-library/vue'
 import { createSubscribe } from '@tests/support/factories/subscribe'
 import {
+  createSubscribeHandler,
   deleteSubscribeByIdHandler,
+  deleteSubscribeHistoryHandler,
   resetSubscribeByIdHandler,
   searchSubscribeByIdHandler,
+  subscribeApiUrls,
   updateSubscribeStatusHandler,
 } from '@tests/support/msw/handlers/subscribe'
 import { server } from '@tests/support/msw/server'
@@ -82,6 +85,7 @@ async function renderCard(
   mediaOverrides: Partial<Subscribe> = {},
   props: Partial<{
     batchMode: boolean
+    isHistory: boolean
     selected: boolean
     sortable: boolean
     source: SubscribeSource | null
@@ -1085,6 +1089,50 @@ describe('SubscribeCard item operations', () => {
       else expect(mocks.toastError).not.toHaveBeenCalled()
     },
   )
+})
+
+describe('SubscribeCard completed history mode', () => {
+  const historyMedia = {
+    date: '2026-08-01 12:00:00',
+    last_update: undefined,
+    state: 'N',
+    total_episode: 0,
+    type: '电视剧',
+  }
+
+  it('shows the completion badge and only resubscribe/delete actions', async () => {
+    const { container } = await renderCard(historyMedia, { isHistory: true })
+
+    expect(container.querySelector('.history-complete-badge')).toBeInTheDocument()
+    expect(container.querySelector('.best-version-badge')).not.toBeInTheDocument()
+    expect(screen.queryByText('订阅中')).not.toBeInTheDocument()
+    const menu = readNativeCardMenu(container.querySelector('.subscribe-card')!)!
+    expect(menu.items.map(item => item.title)).toEqual(['重新订阅', '删除记录'])
+  })
+
+  it('deletes through the history endpoint without touching the active subscription', async () => {
+    const requested = vi.fn()
+    const { container, emitted, media } = await renderCard(historyMedia, { isHistory: true })
+    server.use(deleteSubscribeHistoryHandler(media.id, { success: true }, 200, requested))
+
+    await chooseMenuItem(container, '删除记录')
+
+    await waitFor(() => expect(requested).toHaveBeenCalledOnce())
+    expect(requested.mock.calls[0][0].href).toBe(subscribeApiUrls.historyById(media.id))
+    expect(emitted('save') ?? []).toHaveLength(1)
+  })
+
+  it('reposts the whole record to recreate the subscription', async () => {
+    const created = vi.fn()
+    const { container, emitted, media } = await renderCard(historyMedia, { isHistory: true })
+    server.use(createSubscribeHandler({ data: { id: 99 }, success: true }, 200, created))
+
+    await chooseMenuItem(container, '重新订阅')
+
+    await waitFor(() => expect(created).toHaveBeenCalledOnce())
+    expect(created.mock.calls[0][0]).toMatchObject({ id: media.id, name: media.name })
+    expect(emitted('save') ?? []).toHaveLength(1)
+  })
 })
 
 describe('SubscribeCard compact execution vocabulary', () => {

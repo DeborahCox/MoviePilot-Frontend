@@ -1857,6 +1857,9 @@ export default {
     cancelFailed: '取消訂閱失敗：{message}！',
     notFound: '訂閱不存在！',
     requestFailed: '請求失敗，請稍後重試',
+    completedHistory: '已完成的歷史',
+    resubscribe: '重新訂閱',
+    deleteHistory: '刪除記錄',
     native: {
       invalidMedia: '無法開啟原生訂閱：媒體資訊格式無效。',
       missingId: '無法開啟原生訂閱：請提供有效的媒體資料來源 ID。',
