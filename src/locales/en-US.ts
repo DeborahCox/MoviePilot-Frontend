@@ -5248,6 +5248,10 @@ export default {
       searchIntervalInvalid: 'Enter a whole number of hours from 1 to 8760',
       titleDefault: 'Default Subscription Rules',
       titleEdit: 'Edit Subscription',
+      subscriber: 'Subscriber',
+      subscribedAt: 'Subscribed',
+      configuration: 'Configuration',
+      noConfiguration: 'None',
       seasonFormat: 'Season {number}',
       tabs: {
         basic: 'Basic',

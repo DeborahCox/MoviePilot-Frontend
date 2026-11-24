@@ -65,6 +65,11 @@ const props = defineProps({
     type: Object as PropType<SubscribeSource | null>,
     default: null,
   },
+  // 仅管理员为 true：展示订阅者与订阅时间，普通用户保持原有卡片
+  showSubscriber: {
+    type: Boolean,
+    default: false,
+  },
 })
 
 // 从 provide 中获取全局设置
@@ -93,6 +98,15 @@ const subscribeState = ref<string>(props.media?.state ?? 'P')
 
 // 上一次更新时间
 const lastUpdateText = computed(() => (props.media?.last_update ? formatDateDifference(props.media.last_update) : ''))
+
+// 管理员可见：订阅者与订阅时间；账号来源有昵称时优先展示昵称。
+const subscriberLabel = computed(() => {
+  const username = props.media?.username || ''
+  if (props.source?.kind === 'user' && props.source.name === username) return props.source.label || username
+  return username
+})
+const subscribedAtText = computed(() => (props.media?.date ? formatDateDifference(props.media.date) : ''))
+const showSubscriberLine = computed(() => props.showSubscriber && !!(subscriberLabel.value || subscribedAtText.value))
 
 // 用户主动搜索的状态承担短暂反馈，后台自动检查不覆盖卡片长期进度。
 const visibleExecutionStatus = ref<Subscribe['execution_status'] | null>(null)
@@ -501,7 +515,7 @@ async function shareSubscribe() {
 async function editSubscribeDialog() {
   openSharedDialog(
     SubscribeEditDialog,
-    { subid: props.media?.id },
+    { subid: props.media?.id, ...(props.showSubscriber ? { showSubscriber: true } : {}) },
     {
       remove: onSubscribeEditRemove,
       save: onSubscribeEditSave,
@@ -920,8 +934,16 @@ function handleCardClick() {
                 </div>
 
                 <div class="subscribe-card-mobile-body">
-                  <div class="subscribe-card-mobile-footer">
-                    <div class="subscribe-card-mobile-meta">
+                <div class="subscribe-card-mobile-footer">
+                  <div
+                    v-if="showSubscriberLine"
+                    class="subscribe-card-subscriber-mobile d-flex align-center text-xs text-medium-emphasis"
+                  >
+                    <VIcon icon="mdi-account" size="11" class="flex-shrink-0 me-1" />
+                    <span class="min-w-0 truncate">{{ subscriberLabel }}</span>
+                    <span v-if="subscribedAtText" class="flex-shrink-0 ms-2">· {{ subscribedAtText }}</span>
+                  </div>
+                  <div class="subscribe-card-mobile-meta">
                       <component
                         :is="canOpenExecutionDetails ? 'button' : 'div'"
                         :type="canOpenExecutionDetails ? 'button' : undefined"
@@ -997,7 +1019,10 @@ function handleCardClick() {
               </template>
 
               <div v-else>
-                <VCardText class="subscribe-card-desktop-text flex flex-1 items-center pt-3 pb-9">
+                <VCardText
+                  class="subscribe-card-desktop-text flex flex-1 items-center pt-3"
+                  :class="showSubscriberLine ? 'pb-14' : 'pb-9'"
+                >
                   <!-- 海报外包一层定位容器：海报本身裁切圆角，来源徽标需要越出海报右下角 -->
                   <div v-if="showDesktopPoster" class="subscribe-card-poster-frame relative w-12 flex-shrink-0">
                     <div
@@ -1027,66 +1052,73 @@ function handleCardClick() {
                     </div>
                   </div>
                 </VCardText>
-                <!-- 底部单行：左侧进度或音乐规格，右侧执行状态、暂停/待定或更新时间 -->
+                <!-- 底部：主行保留进度与状态，管理员额外展示一行订阅者信息 -->
                 <VCardText
-                  class="subscribe-card-desktop-text subscribe-card-footer absolute inset-x-0 bottom-1 z-10 flex min-w-0 align-center px-3 py-2"
+                  class="subscribe-card-desktop-text subscribe-card-footer absolute inset-x-0 bottom-1 z-10 min-w-0 px-3 py-2"
                 >
-                  <div class="flex flex-1 min-w-0 align-center">
-                    <VIcon
-                      v-if="hasSubscribeProgress && props.sortable"
-                      icon="mdi-progress-download"
-                      size="small"
-                      color="white"
-                      class="me-1"
-                    />
-                    <IconBtn
-                      v-else-if="hasSubscribeProgress"
-                      size="small"
-                      v-bind="props"
-                      icon="mdi-progress-download"
-                      color="white"
-                    />
-                    <!-- 电视剧按集数、专辑按曲目数展示持续进度；无总数的旧专辑仍走实体元数据。 -->
-                    <div v-if="hasSubscribeProgress" class="flex-shrink-0 text-subtitle-2 me-2 text-white">
-                      {{ subscribeProgressText }}
-                      <VTooltip v-if="subscribeProgressTooltip" activator="parent" location="top">
-                        {{ subscribeProgressTooltip }}
-                      </VTooltip>
+                  <div class="d-flex align-center min-w-0">
+                    <div class="flex flex-1 min-w-0 align-center">
+                      <VIcon
+                        v-if="hasSubscribeProgress && props.sortable"
+                        icon="mdi-progress-download"
+                        size="small"
+                        color="white"
+                        class="me-1"
+                      />
+                      <IconBtn
+                        v-else-if="hasSubscribeProgress"
+                        size="small"
+                        v-bind="props"
+                        icon="mdi-progress-download"
+                        color="white"
+                      />
+                      <!-- 电视剧按集数、专辑按曲目数展示持续进度；无总数的旧专辑仍走实体元数据。 -->
+                      <div v-if="hasSubscribeProgress" class="flex-shrink-0 text-subtitle-2 me-2 text-white">
+                        {{ subscribeProgressText }}
+                        <VTooltip v-if="subscribeProgressTooltip" activator="parent" location="top">
+                          {{ subscribeProgressTooltip }}
+                        </VTooltip>
+                      </div>
+                      <!-- 音乐规格可能很长，与右侧状态同行时截断，完整内容放在 title 中 -->
+                      <div
+                        v-if="musicSubscribeMeta"
+                        class="flex min-w-0 align-center text-subtitle-2 me-2 text-white"
+                        :title="musicSubscribeMeta.text"
+                      >
+                        <VIcon :icon="musicSubscribeMeta.icon" size="small" class="flex-shrink-0 me-1" />
+                        <span class="min-w-0 truncate">{{ musicSubscribeMeta.text }}</span>
+                      </div>
                     </div>
-                    <!-- 音乐规格可能很长，与右侧状态同行时截断，完整内容放在 title 中 -->
-                    <div
-                      v-if="musicSubscribeMeta"
-                      class="flex min-w-0 align-center text-subtitle-2 me-2 text-white"
-                      :title="musicSubscribeMeta.text"
+                    <!-- 右侧元数据：执行中 / 暂停 / 待定时替换"x 天前"为状态文案 -->
+                    <component
+                      :is="canOpenExecutionDetails ? 'button' : 'div'"
+                      v-if="rightBottomStateDisplay"
+                      :type="canOpenExecutionDetails ? 'button' : undefined"
+                      class="subscribe-card-footer-meta d-flex flex-shrink-0 align-center text-xs"
+                      :style="
+                        executionStateDisplay
+                          ? { color: `rgb(var(--v-theme-${executionStateDisplay.color}))` }
+                          : undefined
+                      "
+                      :title="rightBottomStateDisplay.label"
+                      :aria-label="canOpenExecutionDetails ? t('subscribe.execution.details') : undefined"
+                      @click="openExecutionDetails"
                     >
-                      <VIcon :icon="musicSubscribeMeta.icon" size="small" class="flex-shrink-0 me-1" />
-                      <span class="min-w-0 truncate">{{ musicSubscribeMeta.text }}</span>
+                      <VIcon :icon="rightBottomStateDisplay.icon" class="me-1" />
+                      {{ rightBottomStateDisplay.label }}
+                    </component>
+                    <div
+                      v-else-if="lastUpdateText"
+                      class="subscribe-card-footer-meta d-flex flex-shrink-0 align-center text-xs"
+                    >
+                      <VIcon icon="mdi-download" class="me-1" />
+                      {{ lastUpdateText }}
                     </div>
                   </div>
-                  <!-- 右侧元数据：执行中 / 暂停 / 待定时替换"x 天前"为状态文案 -->
-                  <component
-                    :is="canOpenExecutionDetails ? 'button' : 'div'"
-                    v-if="rightBottomStateDisplay"
-                    :type="canOpenExecutionDetails ? 'button' : undefined"
-                    class="subscribe-card-footer-meta d-flex flex-shrink-0 align-center text-xs"
-                    :style="
-                      executionStateDisplay
-                        ? { color: `rgb(var(--v-theme-${executionStateDisplay.color}))` }
-                        : undefined
-                    "
-                    :title="rightBottomStateDisplay.label"
-                    :aria-label="canOpenExecutionDetails ? t('subscribe.execution.details') : undefined"
-                    @click="openExecutionDetails"
-                  >
-                    <VIcon :icon="rightBottomStateDisplay.icon" class="me-1" />
-                    {{ rightBottomStateDisplay.label }}
-                  </component>
-                  <div
-                    v-else-if="lastUpdateText"
-                    class="subscribe-card-footer-meta d-flex flex-shrink-0 align-center text-xs"
-                  >
-                    <VIcon icon="mdi-download" class="me-1" />
-                    {{ lastUpdateText }}
+                  <div v-if="showSubscriberLine" class="subscribe-card-subscriber d-flex align-center text-xs mt-1">
+                    <VIcon icon="mdi-account" size="12" class="flex-shrink-0 me-1" />
+                    <span class="min-w-0 truncate">{{ subscriberLabel }}</span>
+                    <span v-if="subscribedAtText" class="flex-shrink-0 ms-2">· {{ subscribedAtText }}</span>
                   </div>
                 </VCardText>
                 <div class="w-full absolute bottom-0">
@@ -1517,6 +1549,17 @@ button.subscribe-card-mobile-state:active {
   color: rgba(255, 255, 255, 76%);
   padding-inline-start: 0.5rem;
   white-space: nowrap;
+}
+
+/* 桌面订阅者行：位于深色压暗层上，半透明白与上方状态行拉开层级。 */
+.subscribe-card-subscriber {
+  color: rgba(255, 255, 255, 72%);
+  line-height: 1.2;
+}
+
+/* 移动端 dock 为浅色底，订阅者行用弱化前景色而非白色。 */
+.subscribe-card-subscriber-mobile {
+  line-height: 1.2;
 }
 
 /* 缺失封面时的媒体占位背景（图标 + 底色），对齐音乐媒体卡片 */

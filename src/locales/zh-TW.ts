@@ -5102,6 +5102,10 @@ export default {
       searchIntervalInvalid: '請輸入 1–8760 的整數小時數',
       titleDefault: '默認訂閱規則',
       titleEdit: '編輯訂閱',
+      subscriber: '訂閱者',
+      subscribedAt: '訂閱時間',
+      configuration: '設定方案',
+      noConfiguration: '無',
       seasonFormat: '第 {number} 季',
       tabs: {
         basic: '基礎',

@@ -26,7 +26,7 @@ import {
 } from '@/utils/downloadDirectory'
 import type { DownloadDirectoryOption } from '@/utils/downloadDirectory'
 import { buildUserPermissionContext, hasPermission } from '@/utils/permission'
-import { formatSeason } from '@/@core/utils/formatters'
+import { formatDateDifference, formatSeason } from '@/@core/utils/formatters'
 
 // 从变更请求异常中提取可展示消息，并为非标准错误提供稳定兜底。
 function getRequestErrorMessage(error: unknown, fallback: string) {
@@ -56,6 +56,11 @@ const props = defineProps({
   subid: Number,
   default: Boolean,
   type: String,
+  // 管理员可见：展示订阅者、订阅时间与配置方案等元数据
+  showSubscriber: {
+    type: Boolean,
+    default: false,
+  },
 })
 
 // 定义触发的自定义事件
@@ -95,6 +100,28 @@ const subscribeForm = ref<Subscribe>({
   date: '',
   show_edit_dialog: false,
   episode_group: '',
+})
+
+// 管理员可见的订阅元数据：质量/分辨率/特效优先映射成当前语言的显示名，未收录的内部代码原样展示。
+const subscriberInfo = computed(() => {
+  const form = subscribeForm.value
+  const resolveTitle = (options: { title: string; value: string }[], value?: string) => {
+    if (!value) return ''
+    return options.find(option => option.value === value)?.title || value
+  }
+  const configuration = [
+    resolveTitle(qualityOptions.value, form.quality),
+    resolveTitle(resolutionOptions.value, form.resolution),
+    resolveTitle(effectOptions.value, form.effect),
+    form.filter?.trim() || '',
+  ]
+    .filter(Boolean)
+    .join(' + ')
+  return {
+    subscriber: form.username || '',
+    subscribedAt: form.date ? formatDateDifference(form.date) : '',
+    configuration: configuration || t('dialog.subscribeEdit.noConfiguration'),
+  }
 })
 
 // 切换为系统周期时显式提交 null，确保覆盖已保存的独立周期。
@@ -403,6 +430,30 @@ onMounted(() => {
         </VCardSubtitle>
       </VCardItem>
       <VDivider />
+      <VCardText v-if="props.showSubscriber" class="d-flex flex-column ga-2 py-3 px-4 text-body-2">
+        <div class="d-flex align-center">
+          <span class="d-inline-flex align-center flex-shrink-0 me-3 text-medium-emphasis" style="min-width: 5rem">
+            <VIcon icon="mdi-account" size="14" class="me-1" />
+            {{ t('dialog.subscribeEdit.subscriber') }}
+          </span>
+          <span class="font-weight-medium">{{ subscriberInfo.subscriber || '-' }}</span>
+        </div>
+        <div class="d-flex align-center">
+          <span class="d-inline-flex align-center flex-shrink-0 me-3 text-medium-emphasis" style="min-width: 5rem">
+            <VIcon icon="mdi-calendar-clock" size="14" class="me-1" />
+            {{ t('dialog.subscribeEdit.subscribedAt') }}
+          </span>
+          <span class="font-weight-medium">{{ subscriberInfo.subscribedAt || '-' }}</span>
+        </div>
+        <div class="d-flex align-center">
+          <span class="d-inline-flex align-center flex-shrink-0 me-3 text-medium-emphasis" style="min-width: 5rem">
+            <VIcon icon="mdi-tune" size="14" class="me-1" />
+            {{ t('dialog.subscribeEdit.configuration') }}
+          </span>
+          <span class="font-weight-medium">{{ subscriberInfo.configuration }}</span>
+        </div>
+      </VCardText>
+      <VDivider v-if="props.showSubscriber" />
       <VCardText>
         <VForm @submit.prevent="() => {}">
           <VTabs v-model="activeTab" show-arrows>
