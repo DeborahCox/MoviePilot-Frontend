@@ -22,6 +22,7 @@ import {
 } from '@tests/support/msw/handlers/subscribe'
 import { server } from '@tests/support/msw/server'
 import { renderWithProviders } from '@tests/support/render'
+import type { SubscribeSource } from '@/utils/subscribeSource'
 import { HttpResponse, http } from 'msw'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -41,6 +42,8 @@ vi.mock('@/composables/useConfirm', () => ({
 
 interface DialogProps {
   default?: boolean
+  showSubscriber?: boolean
+  subscriberSource?: SubscribeSource | null
   subid?: number
   type?: SubscribeMediaType
 }
@@ -81,6 +84,56 @@ function useDialogOptions(options: SubscribeDialogOptions = {}) {
 describe('SubscribeEditDialog', () => {
   beforeEach(() => {
     mocks.confirm.mockResolvedValue(true)
+  })
+
+  it('shows a read-only subscriber metadata block for administrators', async () => {
+    const record = createSubscribe({
+      id: 830,
+      date: '2026-07-16',
+      name: '订阅者信息测试',
+      type: '电影',
+      username: 'alice',
+    })
+    server.use(subscribeDetailsHandler(830, record))
+    useDialogOptions()
+    await renderDialog({ showSubscriber: true, subid: 830 }, true)
+
+    expect(await screen.findByText('订阅者信息测试')).toBeInTheDocument()
+    expect(screen.getByText('订阅者')).toBeInTheDocument()
+    expect(screen.getByText('订阅时间')).toBeInTheDocument()
+    expect(screen.getByText('配置方案')).toBeInTheDocument()
+    // 没有传入来源目录时退回 username
+    expect(screen.getByText('alice')).toBeInTheDocument()
+  })
+
+  it('hides subscriber metadata from regular users', async () => {
+    const record = createSubscribe({ id: 831, name: '普通用户测试', type: '电影', username: 'alice' })
+    server.use(subscribeDetailsHandler(831, record))
+    useDialogOptions()
+    await renderDialog({ showSubscriber: false, subid: 831 }, false)
+
+    expect(await screen.findByText('普通用户测试')).toBeInTheDocument()
+    expect(screen.queryByText('订阅者')).not.toBeInTheDocument()
+    expect(screen.queryByText('订阅时间')).not.toBeInTheDocument()
+    expect(screen.queryByText('alice')).not.toBeInTheDocument()
+  })
+
+  it('uses the nickname from the card source instead of the raw username', async () => {
+    const record = createSubscribe({ id: 832, name: '昵称一致性测试', type: '电影', username: 'alice' })
+    const subscriberSource: SubscribeSource = {
+      color: 'hsl(10 52% 48%)',
+      initial: '爱',
+      kind: 'user',
+      label: '爱丽丝',
+      name: 'alice',
+    }
+    server.use(subscribeDetailsHandler(832, record))
+    useDialogOptions()
+    await renderDialog({ showSubscriber: true, subid: 832, subscriberSource }, true)
+
+    expect(await screen.findByText('昵称一致性测试')).toBeInTheDocument()
+    expect(screen.getByText('爱丽丝')).toBeInTheDocument()
+    expect(screen.queryByText('alice')).not.toBeInTheDocument()
   })
 
   it('loads a TV subscription, normalizes flags, and exposes episode groups', async () => {

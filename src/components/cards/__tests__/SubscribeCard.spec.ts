@@ -80,7 +80,13 @@ function observeElementsImmediately() {
 
 async function renderCard(
   mediaOverrides: Partial<Subscribe> = {},
-  props: Partial<{ batchMode: boolean; selected: boolean; sortable: boolean; source: SubscribeSource | null }> = {},
+  props: Partial<{
+    batchMode: boolean
+    selected: boolean
+    sortable: boolean
+    source: SubscribeSource | null
+    showSubscriber: boolean
+  }> = {},
   globalImageCache = false,
 ) {
   const media = createSubscribe({
@@ -778,6 +784,49 @@ describe('SubscribeCard display and progress', () => {
     expect(screen.queryByText('排队中')).not.toBeInTheDocument()
     expect(screen.getByText('6 / 10')).toBeInTheDocument()
     if (width >= 600) expect(screen.getByText(formatDateDifference(media.last_update))).toBeInTheDocument()
+  })
+})
+
+describe('SubscribeCard subscriber metadata', () => {
+  beforeEach(() => {
+    mocks.openSharedDialog.mockReturnValue({ close: vi.fn(), id: 1, updateProps: vi.fn() })
+    vi.spyOn(console, 'log').mockImplementation(() => {})
+  })
+
+  it.each([
+    [1024, '.subscribe-card-subscriber'],
+    [390, '.subscribe-card-subscriber-mobile'],
+  ])('shows the subscriber line to administrators at %ipx and hides it from regular users', async (width, selector) => {
+    setViewport(width)
+    observeElementsImmediately()
+    const { container, media, rerender } = await renderCard({ username: '管理员甲' }, { showSubscriber: true })
+
+    const line = await waitFor(() => {
+      const element = container.querySelector(selector)
+      expect(element).not.toBeNull()
+      return element as HTMLElement
+    })
+    expect(line).toHaveTextContent('管理员甲')
+
+    await rerender({ media, showSubscriber: false })
+    expect(container.querySelector(selector)).toBeNull()
+  })
+
+  it('shows the resolved nickname and forwards both admin flags to the edit dialog', async () => {
+    setViewport(1024)
+    observeElementsImmediately()
+    const source: SubscribeSource = {
+      kind: 'user',
+      name: 'alice',
+      label: '爱丽丝',
+      initial: '爱',
+      color: 'hsl(10 52% 48%)',
+    }
+    const { container } = await renderCard({ username: 'alice' }, { showSubscriber: true, source })
+
+    expect(container.querySelector('.subscribe-card-subscriber')).toHaveTextContent('爱丽丝')
+    await fireEvent.click(container.querySelector('.subscribe-card') as HTMLElement)
+    expect(getDialogCall().props).toMatchObject({ showSubscriber: true, subscriberSource: source })
   })
 })
 

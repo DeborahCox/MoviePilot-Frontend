@@ -2,7 +2,7 @@
 import { formatDateDifference } from '@/@core/utils/formatters'
 import type { SubscribeShare } from '@/api/types'
 import router from '@/router'
-import { useGlobalSettingsStore } from '@/stores'
+import { useGlobalSettingsStore, useUserStore } from '@/stores'
 import { openSharedDialog } from '@/composables/useSharedDialog'
 import { getDisplayImageUrl } from '@/utils/imageUtils'
 
@@ -21,6 +21,7 @@ const emit = defineEmits(['delete'])
 // 全局设置
 const globalSettingsStore = useGlobalSettingsStore()
 const globalSettings = globalSettingsStore.globalSettings
+const userStore = useUserStore()
 
 // 背景图与竖版海报的加载状态
 const imageLoaded = ref(false)
@@ -108,7 +109,12 @@ function showForkSubscribe() {
 
 // 完成复用订阅
 function finishForkSubscribe(subid: number) {
-  openSharedDialog(SubscribeEditDialog, { subid }, {}, { closeOn: ['close', 'save', 'remove'] })
+  openSharedDialog(
+    SubscribeEditDialog,
+    { subid, ...(userStore.superUser ? { showSubscriber: true } : {}) },
+    {},
+    { closeOn: ['close', 'save', 'remove'] },
+  )
 }
 
 // 删除订阅分享时处理

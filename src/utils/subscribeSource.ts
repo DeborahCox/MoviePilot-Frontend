@@ -120,3 +120,13 @@ export function resolveSubscribeSource(
     color,
   }
 }
+
+/**
+ * 订阅者展示名：账号来源（来自 users Map 的昵称）优先，插件、外部来源或没有来源数据时退回 username。
+ * 订阅卡片与编辑弹窗共用，保证同一订阅在两处显示同一个名字。
+ */
+export function resolveSubscriberLabel(rawName: string | null | undefined, source?: SubscribeSource | null): string {
+  const name = normalizeSourceName(rawName)
+  if (source?.kind === 'user' && source.name === name) return source.label || name
+  return name
+}

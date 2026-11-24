@@ -102,7 +102,7 @@ export function usePluginSubscriptionManager(
         const changed = () => notifyChanged(request, active)
         openDialog(
           SubscribeEditDialog,
-          { subid: id },
+          { subid: id, ...(userStore.superUser ? { showSubscriber: true } : {}) },
           { save: changed, remove: changed },
           { closeOn: ['close', 'save', 'remove'] },
         )

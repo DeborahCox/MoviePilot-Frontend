@@ -27,6 +27,7 @@ import {
 import type { DownloadDirectoryOption } from '@/utils/downloadDirectory'
 import { buildUserPermissionContext, hasPermission } from '@/utils/permission'
 import { formatDateDifference, formatSeason } from '@/@core/utils/formatters'
+import { resolveSubscriberLabel, type SubscribeSource } from '@/utils/subscribeSource'
 
 // 从变更请求异常中提取可展示消息，并为非标准错误提供稳定兜底。
 function getRequestErrorMessage(error: unknown, fallback: string) {
@@ -60,6 +61,11 @@ const props = defineProps({
   showSubscriber: {
     type: Boolean,
     default: false,
+  },
+  // 订阅卡片传入的来源（含账号昵称）；其他入口没有来源数据时展示 username
+  subscriberSource: {
+    type: Object as PropType<SubscribeSource | null>,
+    default: null,
   },
 })
 
@@ -118,7 +124,7 @@ const subscriberInfo = computed(() => {
     .filter(Boolean)
     .join(' + ')
   return {
-    subscriber: form.username || '',
+    subscriber: resolveSubscriberLabel(form.username, props.subscriberSource),
     subscribedAt: form.date ? formatDateDifference(form.date) : '',
     configuration: configuration || t('dialog.subscribeEdit.noConfiguration'),
   }

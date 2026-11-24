@@ -9,6 +9,7 @@ import { openSharedDialog } from '@/composables/useSharedDialog'
 import { useConfirm } from '@/composables/useConfirm'
 import { setCachedMediaSubscribeStatus } from '@/utils/mediaStatusCache'
 import { isMediaDataSource, isValidMediaSourceId } from '@/utils/mediaId'
+import { useUserStore } from '@/stores'
 
 export type SubscribeMode = 'normal' | 'best_version' | 'best_version_full'
 
@@ -126,7 +127,12 @@ function getRequestErrorMessage(error: unknown, fallback: string) {
 
 /** 捕获组件上下文中的依赖，供后续独立订阅交互复用。 */
 export function useMediaSubscribeFactory() {
-  const dependencies = { t: useI18n().t, $toast: useToast(), createConfirm: useConfirm() }
+  const dependencies = {
+    t: useI18n().t,
+    $toast: useToast(),
+    createConfirm: useConfirm(),
+    userStore: useUserStore(),
+  }
   return (options: UseMediaSubscribeOptions) => createMediaSubscribe(options, dependencies)
 }
 
@@ -142,10 +148,12 @@ function createMediaSubscribe(
     t,
     $toast,
     createConfirm,
+    userStore,
   }: {
     t: ReturnType<typeof useI18n>['t']
     $toast: ReturnType<typeof useToast>
     createConfirm: ReturnType<typeof useConfirm>
+    userStore: ReturnType<typeof useUserStore>
   },
 ) {
   const episodeGroup = ref('')
@@ -209,7 +217,7 @@ function createMediaSubscribe(
   function openSubscribeEditDialog(subid: number, season: number | null, mode: SubscribeMode) {
     openSharedDialog(
       SubscribeEditDialog,
-      { subid },
+      { subid, ...(userStore.superUser ? { showSubscriber: true } : {}) },
       {
         save: (subscribe?: Subscribe) => {
           const savedSeason = currentMedia()?.type === '电影' ? null : (subscribe?.season ?? season)

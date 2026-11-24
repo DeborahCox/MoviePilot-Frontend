@@ -19,7 +19,7 @@ import { loadPosterTone, type PosterTone } from '@/utils/posterTone'
 import { buildMusicDetailRoute, formatMusicAudioSpecs, formatMusicBitrate } from '@/utils/music'
 import SubscribeExecutionDialog from '@/components/dialog/SubscribeExecutionDialog.vue'
 import SubscribeSourceMark from '@/components/misc/SubscribeSourceMark.vue'
-import type { SubscribeSource } from '@/utils/subscribeSource'
+import { resolveSubscriberLabel, type SubscribeSource } from '@/utils/subscribeSource'
 import {
   formatSubscriptionResumeTime,
   subscriptionExecutionLabel,
@@ -100,11 +100,7 @@ const subscribeState = ref<string>(props.media?.state ?? 'P')
 const lastUpdateText = computed(() => (props.media?.last_update ? formatDateDifference(props.media.last_update) : ''))
 
 // 管理员可见：订阅者与订阅时间；账号来源有昵称时优先展示昵称。
-const subscriberLabel = computed(() => {
-  const username = props.media?.username || ''
-  if (props.source?.kind === 'user' && props.source.name === username) return props.source.label || username
-  return username
-})
+const subscriberLabel = computed(() => resolveSubscriberLabel(props.media?.username, props.source))
 const subscribedAtText = computed(() => (props.media?.date ? formatDateDifference(props.media.date) : ''))
 const showSubscriberLine = computed(() => props.showSubscriber && !!(subscriberLabel.value || subscribedAtText.value))
 
@@ -515,7 +511,10 @@ async function shareSubscribe() {
 async function editSubscribeDialog() {
   openSharedDialog(
     SubscribeEditDialog,
-    { subid: props.media?.id, ...(props.showSubscriber ? { showSubscriber: true } : {}) },
+    {
+      subid: props.media?.id,
+      ...(props.showSubscriber ? { showSubscriber: true, subscriberSource: props.source } : {}),
+    },
     {
       remove: onSubscribeEditRemove,
       save: onSubscribeEditSave,
@@ -934,16 +933,16 @@ function handleCardClick() {
                 </div>
 
                 <div class="subscribe-card-mobile-body">
-                <div class="subscribe-card-mobile-footer">
-                  <div
-                    v-if="showSubscriberLine"
-                    class="subscribe-card-subscriber-mobile d-flex align-center text-xs text-medium-emphasis"
-                  >
-                    <VIcon icon="mdi-account" size="11" class="flex-shrink-0 me-1" />
-                    <span class="min-w-0 truncate">{{ subscriberLabel }}</span>
-                    <span v-if="subscribedAtText" class="flex-shrink-0 ms-2">· {{ subscribedAtText }}</span>
-                  </div>
-                  <div class="subscribe-card-mobile-meta">
+                  <div class="subscribe-card-mobile-footer">
+                    <div
+                      v-if="showSubscriberLine"
+                      class="subscribe-card-subscriber-mobile d-flex align-center text-xs text-medium-emphasis"
+                    >
+                      <VIcon icon="mdi-account" size="11" class="flex-shrink-0 me-1" />
+                      <span class="min-w-0 truncate">{{ subscriberLabel }}</span>
+                      <span v-if="subscribedAtText" class="flex-shrink-0 ms-2">· {{ subscribedAtText }}</span>
+                    </div>
+                    <div class="subscribe-card-mobile-meta">
                       <component
                         :is="canOpenExecutionDetails ? 'button' : 'div'"
                         :type="canOpenExecutionDetails ? 'button' : undefined"
