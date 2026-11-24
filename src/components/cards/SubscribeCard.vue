@@ -1184,7 +1184,7 @@ function handleCardClick() {
               <div v-else>
                 <VCardText
                   class="subscribe-card-desktop-text flex flex-1 items-center pt-3"
-                  :class="showSubscriberLine ? 'pb-14' : 'pb-9'"
+                  :class="showSubscriber || showSubscriberLine ? 'pb-14' : 'pb-9'"
                 >
                   <!-- 海报外包一层定位容器：海报本身裁切圆角，来源徽标需要越出海报右下角 -->
                   <div v-if="showDesktopPoster" class="subscribe-card-poster-frame relative w-12 flex-shrink-0">
