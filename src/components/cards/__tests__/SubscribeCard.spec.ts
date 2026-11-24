@@ -1136,7 +1136,7 @@ describe('SubscribeCard completed history mode', () => {
     expect(container.querySelector('.best-version-badge')).not.toBeInTheDocument()
     expect(screen.queryByText('订阅中')).not.toBeInTheDocument()
     const menu = readNativeCardMenu(container.querySelector('.subscribe-card')!)!
-    expect(menu.items.map(item => item.title)).toEqual(['重新订阅', '删除记录', '订阅活动'])
+    expect(menu.items.map(item => item.title)).toEqual(['订阅活动', '重新订阅', '删除记录'])
     expect(menu.items.find(item => item.title === '订阅活动')?.icon).toBe('mdi-text-box-search-outline')
   })
 
@@ -1167,6 +1167,30 @@ describe('SubscribeCard completed history mode', () => {
     expect(
       mocks.openSharedDialog.mock.calls.every(([, props]) => (props as Record<string, unknown>).history === true),
     ).toBe(true)
+  })
+
+  it('opens history activity when a history card is clicked directly', async () => {
+    setViewport(1024)
+    observeElementsImmediately()
+    const { container, media } = await renderCard(historyMedia, { isHistory: true })
+
+    await fireEvent.click(container.querySelector('.subscribe-card') as HTMLElement)
+
+    expect(mocks.openSharedDialog).toHaveBeenCalledOnce()
+    const dialog = getDialogCall()
+    expect(dialog.props).toEqual({ subscription: media, history: true })
+    expect(dialog.options).toEqual({ closeOn: ['close'] })
+  })
+
+  it('keeps batch selection priority over the history activity click path', async () => {
+    setViewport(1024)
+    observeElementsImmediately()
+    const { container, emitted } = await renderCard(historyMedia, { isHistory: true, batchMode: true })
+
+    await fireEvent.click(container.querySelector('.subscribe-card') as HTMLElement)
+
+    expect(emitted('select')).toHaveLength(1)
+    expect(mocks.openSharedDialog).not.toHaveBeenCalled()
   })
 
   it('deletes through the history endpoint without touching the active subscription', async () => {

@@ -740,8 +740,17 @@ const activeDropdownItems = computed(() => [
   },
 ])
 
-// 历史记录只提供重新订阅、删除记录与订阅活动；其他活跃订阅操作都可能误操作同号订阅。
+// 历史记录只提供订阅活动、重新订阅与删除记录；其他活跃订阅操作都可能误操作同号订阅。
 const historyDropdownItems = computed(() => [
+  {
+    title: t('subscriptionActivity.title'),
+    value: 3,
+    show: true,
+    props: {
+      prependIcon: 'mdi-text-box-search-outline',
+      click: viewHistoryActivity,
+    },
+  },
   {
     title: t('subscribe.resubscribe'),
     value: 1,
@@ -759,15 +768,6 @@ const historyDropdownItems = computed(() => [
       prependIcon: 'mdi-delete',
       color: 'error',
       click: deleteHistoryRecord,
-    },
-  },
-  {
-    title: t('subscriptionActivity.title'),
-    value: 3,
-    show: true,
-    props: {
-      prependIcon: 'mdi-text-box-search-outline',
-      click: viewHistoryActivity,
     },
   },
 ])
@@ -913,18 +913,22 @@ function onSubscribeEditRemove() {
 
 // 处理卡片点击事件
 function handleCardClick() {
-  // 历史卡片不可编辑，点击不触发任何活跃订阅操作。
-  if (props.isHistory || props.sortable) {
+  if (props.sortable) return
+
+  if (props.batchMode) {
+    // 批量模式下触发选择事件，优先于历史卡片的活动入口。
+    emit('select')
     return
   }
 
-  if (props.batchMode) {
-    // 批量模式下触发选择事件
-    emit('select')
-  } else {
-    // 非批量模式下打开编辑弹窗
-    editSubscribeDialog()
+  if (props.isHistory) {
+    // 历史卡片不可编辑，点击直接查看订阅活动。
+    viewHistoryActivity()
+    return
   }
+
+  // 非批量模式下打开编辑弹窗
+  editSubscribeDialog()
 }
 </script>
 
