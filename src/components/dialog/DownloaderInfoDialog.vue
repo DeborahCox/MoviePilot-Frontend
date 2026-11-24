@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import type { DownloaderConf } from '@/api/types'
+import api from '@/api'
+import type { DownloaderConf, User } from '@/api/types'
 import { cloneDeep } from 'lodash-es'
 import { useToast } from 'vue-toastification'
 import { useI18n } from 'vue-i18n'
@@ -71,7 +72,24 @@ const downloaderInfo = ref<DownloaderConf>({
   enabled: false,
   config: {},
   path_mapping: [],
+  allowed_users: [],
 })
+
+// 允许的用户选项，item-title 显示昵称或用户名，item-value 使用用户名
+const userOptions = ref<{ title: string; value: string }[]>([])
+
+/** 加载用户列表，供“允许的用户”多选使用；无权限时静默失败。 */
+async function loadUserOptions() {
+  try {
+    const users = await api.get<User[]>('user/', { feedback: 'silent' })
+    userOptions.value = (users || []).map(user => ({
+      title: user.nickname || user.name,
+      value: user.name,
+    }))
+  } catch (error) {
+    userOptions.value = []
+  }
+}
 
 // 路径映射行定义
 interface PathMappingRow {
@@ -206,6 +224,7 @@ watch(
 
 onMounted(() => {
   initializeDownloaderInfo()
+  void loadUserOptions()
 })
 </script>
 
@@ -238,6 +257,25 @@ onMounted(() => {
                 v-model="downloaderInfo.default"
                 :label="t('downloader.default')"
                 :disabled="!downloaderInfo.enabled"
+              />
+            </VCol>
+          </VRow>
+          <VRow>
+            <VCol cols="12">
+              <VAutocomplete
+                v-model="downloaderInfo.allowed_users"
+                :label="t('downloader.allowedUsers')"
+                :items="userOptions"
+                item-title="title"
+                item-value="value"
+                multiple
+                chips
+                closable-chips
+                clearable
+                density="compact"
+                :hint="t('downloader.allowedUsersHint')"
+                persistent-hint
+                prepend-inner-icon="mdi-account-multiple"
               />
             </VCol>
           </VRow>

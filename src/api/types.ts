@@ -2318,6 +2318,8 @@ export interface DownloaderConf {
   enabled: boolean
   // 路径映射
   path_mapping?: Array<[storagePath: string, downloadPath: string]>
+  // 允许的用户，为空时所有用户可用
+  allowed_users?: string[]
 }
 
 // 通知配置
@@ -2385,6 +2387,8 @@ export interface MediaServerConf {
   sync_libraries?: string[]
   // 自动同步间隔（小时），为空时使用旧全局配置
   sync_interval?: number | null
+  // 允许的用户，为空时所有用户可用
+  allowed_users?: string[]
 }
 
 // 不包含连接配置和凭据的媒体服务器选择项

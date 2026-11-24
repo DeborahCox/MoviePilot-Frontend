@@ -1,5 +1,6 @@
 import MediaServerInfoDialog from '@/components/dialog/MediaServerInfoDialog.vue'
 import type { MediaServerConf } from '@/api/types'
+import userEvent from '@testing-library/user-event'
 import { fireEvent, screen } from '@testing-library/vue'
 import { renderWithProviders } from '@tests/support/render'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -46,6 +47,37 @@ describe('MediaServerInfoDialog Plex timeout', () => {
     await fireEvent.click(screen.getByRole('button', { name: '确认' }))
     expect(mocks.toastError).toHaveBeenCalledWith(name ? '【Existing】已存在，请替换为其他名称' : '必填，不可重名')
     expect(onChange).not.toHaveBeenCalled()
+  })
+
+  it('allowed_users 可多选并在确认时随结果 emit，item-value 使用用户名', async () => {
+    const onChange = vi.fn()
+    mocks.apiGet.mockImplementation((url: string) => {
+      if (url === 'user/') return Promise.resolve([{ name: 'alice', nickname: '爱丽丝' }])
+      return Promise.resolve([])
+    })
+
+    await renderWithProviders(MediaServerInfoDialog, {
+      props: {
+        modelValue: true,
+        mediaserver: plexServer,
+        mediaservers: [plexServer],
+        onChange,
+      },
+      global: { stubs: { VDialogCloseBtn: true } },
+    })
+
+    // 昵称用于展示，用户名作为实际值
+    expect(screen.getAllByText('允许的用户').length).toBeGreaterThan(0)
+    const user = userEvent.setup()
+    await user.click(screen.getByLabelText('允许的用户'))
+    await user.click(await screen.findByRole('option', { name: '爱丽丝' }))
+    await fireEvent.click(screen.getByRole('button', { name: '确认' }))
+
+    expect(mocks.apiGet).toHaveBeenCalledWith('user/', { feedback: 'silent' })
+    expect(onChange).toHaveBeenCalledWith(
+      expect.objectContaining({ allowed_users: ['alice'] }),
+      'Plex',
+    )
   })
 
   it('shows the 30-second default and saves the configured Plex timeout', async () => {

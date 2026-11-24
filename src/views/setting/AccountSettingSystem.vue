@@ -1288,6 +1288,7 @@ function addDownloader(downloader: string) {
     default: false,
     enabled: false,
     config: {},
+    allowed_users: [],
   })
 }
 
@@ -1314,6 +1315,7 @@ function addMediaServer(mediaserver: string) {
     type: mediaserver,
     enabled: false,
     config: {},
+    allowed_users: [],
   })
 }
 

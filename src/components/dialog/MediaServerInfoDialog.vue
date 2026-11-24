@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import api from '@/api'
-import type { MediaServerConf, MediaServerLibrary } from '@/api/types'
+import type { MediaServerConf, MediaServerLibrary, User } from '@/api/types'
 import { cloneDeep } from 'lodash-es'
 import { useToast } from 'vue-toastification'
 import { useI18n } from 'vue-i18n'
@@ -68,7 +68,24 @@ const mediaServerInfo = ref<MediaServerConf>({
   type: '',
   enabled: false,
   config: {},
+  allowed_users: [],
 })
+
+// 允许的用户选项，item-title 显示昵称或用户名，item-value 使用用户名
+const userOptions = ref<{ title: string; value: string }[]>([])
+
+/** 加载用户列表，供“允许的用户”多选使用；无权限时静默失败。 */
+async function loadUserOptions() {
+  try {
+    const users = await api.get<User[]>('user/', { feedback: 'silent' })
+    userOptions.value = (users || []).map(user => ({
+      title: user.nickname || user.name,
+      value: user.name,
+    }))
+  } catch (error) {
+    userOptions.value = []
+  }
+}
 
 // 同步媒体库选项
 const librariesOptions = ref<{ title: string; value: string | undefined }[]>([
@@ -255,6 +272,7 @@ watch(
 
 onMounted(() => {
   initializeMediaServerInfo()
+  void loadUserOptions()
 })
 </script>
 
@@ -281,6 +299,25 @@ onMounted(() => {
           <VRow>
             <VCol cols="12" md="6">
               <VSwitch v-model="mediaServerInfo.enabled" :label="t('mediaserver.enableMediaServer')" />
+            </VCol>
+          </VRow>
+          <VRow>
+            <VCol cols="12">
+              <VAutocomplete
+                v-model="mediaServerInfo.allowed_users"
+                :label="t('mediaserver.allowedUsers')"
+                :items="userOptions"
+                item-title="title"
+                item-value="value"
+                multiple
+                chips
+                closable-chips
+                clearable
+                density="compact"
+                :hint="t('mediaserver.allowedUsersHint')"
+                persistent-hint
+                prepend-inner-icon="mdi-account-multiple"
+              />
             </VCol>
           </VRow>
           <VRow v-if="mediaServerInfo.type == 'emby'">

@@ -6112,6 +6112,8 @@ export default {
     customTypeHint: 'Custom downloader type, for plugin scenarios',
     rtorrentHostHint: 'HTTP: http://ip:port/RPC2 or SCGI: scgi://ip:port',
     default: 'Default',
+    allowedUsers: 'Allowed users',
+    allowedUsersHint: 'Leave empty for all users',
     host: 'Host',
     apiKey: 'API Key',
     username: 'Username',
@@ -6169,6 +6171,8 @@ export default {
     type: 'Type',
     customTypeHint: 'Custom media server type, for plugin scenarios',
     enableMediaServer: 'Enable Media Server',
+    allowedUsers: 'Allowed users',
+    allowedUsersHint: 'Leave empty for all users',
     syncInterval: 'Automatic Sync Interval',
     syncIntervalHint:
       'Leave blank to use the legacy global default ({interval} hours); set to 0 to disable automatic sync for this server',
