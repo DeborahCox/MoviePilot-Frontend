@@ -70,7 +70,59 @@ const displayName = computed(() => {
 
 // 历史默认头像可能保存了旧构建路径，加载失败时使用当前版本内置头像。
 const avatarLoadError = ref(false)
-const avatarSource = computed(() => props.user.avatar?.trim() || '')
+
+/** 从 base64 头部识别真实图片格式，后端常把头像误标为 data:image/ico。 */
+function detectImageMimeFromBase64(base64: string): string | undefined {
+  let bytes: number[] = []
+  try {
+    // 只解码头部（16 个 base64 字符 ≈ 12 字节），避免对完整头像做无谓计算。
+    const head = atob(base64.replace(/\s/g, '').slice(0, 16))
+    bytes = Array.from(head, char => char.charCodeAt(0))
+  } catch {
+    return undefined
+  }
+  if (bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47) return 'png'
+  if (bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return 'jpeg'
+  if (bytes[0] === 0x47 && bytes[1] === 0x49 && bytes[2] === 0x46) return 'gif'
+  if (
+    bytes[0] === 0x52 &&
+    bytes[1] === 0x49 &&
+    bytes[2] === 0x46 &&
+    bytes[3] === 0x46 &&
+    bytes[8] === 0x57 &&
+    bytes[9] === 0x45 &&
+    bytes[10] === 0x42 &&
+    bytes[11] === 0x50
+  )
+    return 'webp'
+  if (bytes[0] === 0x00 && bytes[1] === 0x00 && bytes[2] === 0x01 && bytes[3] === 0x00) return 'x-icon'
+  return undefined
+}
+
+/**
+ * 后端头像上传固定写成 data:image/ico;base64，浏览器对该 MIME 解码支持差。
+ * 按 base64 魔数改写为真实格式，无法识别时至少降级为通用的 image/x-icon。
+ */
+function normalizeAvatarSource(value: string): string {
+  const matched = /^data:image\/([^;,]+)(;base64)?,(.*)$/is.exec(value)
+  if (!matched || matched[1].toLowerCase() !== 'ico') return value
+  if (!matched[2]) return `data:image/x-icon,${matched[3]}`
+  const realMime = detectImageMimeFromBase64(matched[3]) ?? 'x-icon'
+  return `data:image/${realMime};base64,${matched[3]}`
+}
+
+/** 只接受 data URL、http(s) 地址及站内根相对路径，其余（含 null/空白）回退内置头像。 */
+function isValidAvatarSource(value: string): boolean {
+  if (!value) return false
+  if (/^data:/i.test(value)) return true
+  if (/^https?:\/\//i.test(value)) return true
+  return /^\/(?!\/)/.test(value)
+}
+
+const avatarSource = computed(() => {
+  const raw = props.user.avatar?.trim() ?? ''
+  return isValidAvatarSource(raw) ? normalizeAvatarSource(raw) : ''
+})
 const avatarUrl = computed(() =>
   getDisplayImageUrl(
     avatarLoadError.value || !avatarSource.value ? avatar1 : avatarSource.value,
@@ -188,7 +240,7 @@ onMounted(() => {
                 <VImg :src="avatarUrl" :alt="user.name" eager @error="avatarLoadError = true" />
                 <div
                   v-if="!user.is_active"
-                  class="position-absolute d-flex align-center justify-center rounded-lg bg-surface-variant opacity-20"
+                  class="position-absolute d-flex align-center justify-center rounded-lg bg-surface-variant opacity-10"
                   style="inset: 0"
                 >
                   <VIcon icon="mdi-account-lock" color="white" />

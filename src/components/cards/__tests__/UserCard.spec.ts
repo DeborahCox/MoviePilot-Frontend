@@ -135,9 +135,27 @@ describe('UserCard', () => {
     expect(screen.getByText('未设置邮箱')).toBeInTheDocument()
   })
 
-  it.each(['', '   '])('shows the built-in avatar when the new user has no avatar (%j)', async avatar => {
+  it.each(['', '   ', null])('shows the built-in avatar when the new user has no avatar (%j)', async avatar => {
     const { container } = await renderCard({ user: { avatar } })
     expect(container.querySelector('.v-avatar img')).toHaveAttribute('src', avatar1)
+  })
+
+  it('normalizes mislabeled data:image/ico avatars to a browser-decodable mime', async () => {
+    // iVBORw0KGgo 是 PNG 魔数的标准 base64 前缀，后端却把它标成 image/ico。
+    const legacyIco = 'data:image/ico;base64,iVBORw0KGgoAAAANSUhEUg=='
+    const { container } = await renderCard({ user: { avatar: legacyIco } })
+    expect(container.querySelector('.v-avatar img')).toHaveAttribute(
+      'src',
+      'data:image/png;base64,iVBORw0KGgoAAAANSUhEUg==',
+    )
+  })
+
+  it('keeps the lock marker but does not hide the avatar for inactive users', async () => {
+    const { container } = await renderCard({ user: { avatar: '/avatars/avatar.png', is_active: false } })
+    expect(container.querySelector('.v-avatar img')).toHaveAttribute('src', '/avatars/avatar.png')
+    expect(screen.getByText('mdi-account-lock')).toBeInTheDocument()
+    expect(container.querySelector('.bg-surface-variant.opacity-10')).toBeInTheDocument()
+    expect(container.querySelector('.bg-surface-variant.opacity-20')).not.toBeInTheDocument()
   })
 
   it('falls back from an unavailable saved avatar and retries a changed avatar source', async () => {

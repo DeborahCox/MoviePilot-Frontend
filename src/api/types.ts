@@ -1956,8 +1956,8 @@ export interface User {
   is_active: boolean
   // 是否管理员
   is_superuser: boolean
-  // 头像
-  avatar: string
+  // 头像（后端为 Optional[str]，未设置时为 null）
+  avatar?: string | null
   // 是否开启二次验证
   is_otp: boolean
   // 用户权限 json

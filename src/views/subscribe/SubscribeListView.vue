@@ -269,7 +269,7 @@ async function loadSubscribeSourceDirectory() {
   const directory = emptySubscribeSourceDirectory()
   if (users.status === 'fulfilled') {
     for (const user of users.value ?? []) {
-      directory.users.set(user.name, { nickname: user.nickname, avatar: user.avatar })
+      directory.users.set(user.name, { nickname: user.nickname, avatar: user.avatar ?? undefined })
     }
   }
   if (plugins.status === 'fulfilled') {
