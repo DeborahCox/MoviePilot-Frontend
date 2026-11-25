@@ -2043,6 +2043,30 @@ export interface DashboardSystemInfo {
   version: string
 }
 
+// 仪表盘最近整理条目：只包含展示所需字段，不暴露源文件路径等管理信息
+export interface DashboardRecentImport {
+  // 整理记录标识
+  id: number
+  // 媒体标题
+  title?: string | null
+  // 年份
+  year?: string | null
+  // 海报地址
+  image?: string | null
+  // 媒体类型
+  type?: string | null
+  // 季
+  seasons?: string | null
+  // 集
+  episodes?: string | null
+  // 完成时间
+  date?: string | null
+  // 文件大小，单位为字节
+  size?: number | null
+  // 音乐规格摘要
+  audio_specs?: string | null
+}
+
 // 下载器信息
 export interface DownloaderInfo {
   // 下载速度

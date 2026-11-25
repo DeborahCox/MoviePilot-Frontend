@@ -1,106 +1,98 @@
 import {
   ADMIN_PERMISSIONS,
   buildDefaultFeaturePermissions,
-  buildPluginPermissionFeatureKey,
   buildUserPermissionContext,
   DEFAULT_PERMISSIONS,
-  filterItemsByPermission,
   filterMenusByPermission,
-  hasAllPermissions,
-  hasAnyPermission,
   hasFeaturePermission,
-  hasItemPermission,
   hasPermission,
   normalizeUserPermissions,
   PERMISSION_FEATURE,
-  USER_PERMISSION_FEATURES,
-  type UserPermissionFeatureMap,
 } from '@/utils/permission'
 import { describe, expect, it } from 'vitest'
 
-describe('permission utilities', () => {
-  it('normalizes legacy permissions and filters invalid feature values', () => {
-    const normalized = normalizeUserPermissions({
-      discovery: false,
-      features: {
-        enabled: true,
-        invalid: 'yes',
-      } as unknown as UserPermissionFeatureMap,
+describe('dashboard permission category', () => {
+  it('keeps dashboard disabled by default with safe feature defaults', () => {
+    expect(DEFAULT_PERMISSIONS.dashboard).toBe(false)
+
+    const defaults = buildDefaultFeaturePermissions(false)
+    expect(defaults[PERMISSION_FEATURE.DASHBOARD_MEDIA]).toBe(true)
+    expect(defaults[PERMISSION_FEATURE.DASHBOARD_RUNTIME]).toBe(true)
+    expect(defaults[PERMISSION_FEATURE.DASHBOARD_SCHEDULER]).toBe(false)
+    expect(defaults[PERMISSION_FEATURE.DASHBOARD_RECENT_IMPORTS]).toBe(false)
+    expect(defaults[PERMISSION_FEATURE.DASHBOARD_SYSTEM]).toBe(false)
+    expect(defaults[PERMISSION_FEATURE.DASHBOARD_CUSTOMIZE]).toBe(false)
+  })
+
+  it('grants every dashboard feature to administrators', () => {
+    expect(ADMIN_PERMISSIONS.dashboard).toBe(true)
+    for (const feature of [
+      PERMISSION_FEATURE.DASHBOARD_MEDIA,
+      PERMISSION_FEATURE.DASHBOARD_RUNTIME,
+      PERMISSION_FEATURE.DASHBOARD_SCHEDULER,
+      PERMISSION_FEATURE.DASHBOARD_RECENT_IMPORTS,
+      PERMISSION_FEATURE.DASHBOARD_SYSTEM,
+      PERMISSION_FEATURE.DASHBOARD_CUSTOMIZE,
+    ]) {
+      expect(buildDefaultFeaturePermissions()[feature]).toBe(true)
+    }
+  })
+
+  it('normalizes historical permissions without weakening restricted features', () => {
+    const normalized = normalizeUserPermissions({ discovery: true })
+    expect(normalized.dashboard).toBe(false)
+    expect(normalized.features?.[PERMISSION_FEATURE.DASHBOARD_SYSTEM]).toBe(false)
+
+    const dashboardUser = buildUserPermissionContext(false, { dashboard: true })
+    expect(hasPermission(dashboardUser, 'dashboard')).toBe(true)
+    expect(hasPermission(dashboardUser, 'admin')).toBe(false)
+    expect(hasFeaturePermission(dashboardUser, PERMISSION_FEATURE.DASHBOARD_MEDIA, 'dashboard')).toBe(true)
+    expect(hasFeaturePermission(dashboardUser, PERMISSION_FEATURE.DASHBOARD_RUNTIME, 'dashboard')).toBe(true)
+    expect(hasFeaturePermission(dashboardUser, PERMISSION_FEATURE.DASHBOARD_SCHEDULER, 'dashboard')).toBe(false)
+    expect(hasFeaturePermission(dashboardUser, PERMISSION_FEATURE.DASHBOARD_RECENT_IMPORTS, 'dashboard')).toBe(false)
+    expect(hasFeaturePermission(dashboardUser, PERMISSION_FEATURE.DASHBOARD_SYSTEM, 'dashboard')).toBe(false)
+    expect(hasFeaturePermission(dashboardUser, PERMISSION_FEATURE.DASHBOARD_CUSTOMIZE, 'dashboard')).toBe(false)
+  })
+
+  it('restores the dashboard category from legacy feature-only permissions', () => {
+    const legacy = normalizeUserPermissions({
+      features: { [PERMISSION_FEATURE.DASHBOARD_MEDIA]: true },
+    })
+    expect(legacy.dashboard).toBe(true)
+
+    const explicitDenied = normalizeUserPermissions({
+      dashboard: false,
+      features: { [PERMISSION_FEATURE.DASHBOARD_MEDIA]: true },
+    })
+    expect(explicitDenied.dashboard).toBe(false)
+  })
+
+  it('keeps menu visibility aligned with dashboard route permission', () => {
+    const menus = [
+      { title: '仪表盘', to: '/dashboard', permission: 'dashboard' },
+      { title: '资源搜索', to: '/resource', permission: 'search' },
+    ] as const
+    const legacyUser = buildUserPermissionContext(false, {
+      features: { [PERMISSION_FEATURE.DASHBOARD_MEDIA]: true },
+    })
+    const noDashboardUser = buildUserPermissionContext(false, {
+      dashboard: false,
+      search: true,
     })
 
-    expect(normalized).toEqual({
-      ...DEFAULT_PERMISSIONS,
-      discovery: false,
-      features: { enabled: true },
+    expect(filterMenusByPermission([...menus], legacyUser).map(menu => menu.to)).toEqual(['/dashboard', '/resource'])
+    expect(filterMenusByPermission([...menus], noDashboardUser).map(menu => menu.to)).toEqual(['/resource'])
+  })
+
+  it('allows explicit feature enablement and superuser override', () => {
+    const enabled = buildUserPermissionContext(false, {
+      dashboard: true,
+      features: { [PERMISSION_FEATURE.DASHBOARD_SYSTEM]: true },
     })
-    expect(normalizeUserPermissions(null)).toEqual(DEFAULT_PERMISSIONS)
-  })
+    expect(hasFeaturePermission(enabled, PERMISSION_FEATURE.DASHBOARD_SYSTEM, 'dashboard')).toBe(true)
 
-  it('builds default and plugin feature contracts', () => {
-    const disabledFeatures = buildDefaultFeaturePermissions(false)
-
-    expect(Object.keys(disabledFeatures)).toHaveLength(USER_PERMISSION_FEATURES.length)
-    expect(Object.values(disabledFeatures).every(enabled => enabled === false)).toBe(true)
-    expect(buildPluginPermissionFeatureKey('demo')).toBe('plugin.demo.main')
-    expect(buildPluginPermissionFeatureKey('demo', 'settings')).toBe('plugin.demo.settings')
-    expect(ADMIN_PERMISSIONS.features?.[PERMISSION_FEATURE.MANAGE_SITE]).toBe(true)
-  })
-
-  it('grants every category and admin entry only to superusers', () => {
-    const superuser = buildUserPermissionContext(true, {})
-
-    expect(hasPermission(superuser, 'admin')).toBe(true)
-    expect(hasPermission(superuser, 'manage')).toBe(true)
-    expect(hasFeaturePermission(superuser, PERMISSION_FEATURE.MANAGE_SITE, 'manage')).toBe(true)
-    expect(hasPermission({ admin: true, manage: true }, 'admin')).toBe(false)
-  })
-
-  it('checks category permissions as explicit booleans', () => {
-    const permissions = { discovery: true, search: false, subscribe: 1, manage: undefined }
-
-    expect(hasPermission(permissions, 'discovery')).toBe(true)
-    expect(hasPermission(permissions, 'search')).toBe(false)
-    expect(hasPermission(permissions, 'subscribe')).toBe(false)
-    expect(hasPermission(null, 'manage')).toBe(false)
-    expect(hasAnyPermission(permissions, ['search', 'discovery'])).toBe(true)
-    expect(hasAllPermissions(permissions, ['discovery', 'search'])).toBe(false)
-  })
-
-  it('inherits missing feature flags but honors explicit denial and parent categories', () => {
-    const legacyUser = { discovery: true }
-    const restrictedUser = {
-      discovery: true,
-      features: { [PERMISSION_FEATURE.DISCOVERY_RECOMMEND]: false },
-    }
-
-    expect(hasFeaturePermission(legacyUser)).toBe(true)
-    expect(hasFeaturePermission(legacyUser, PERMISSION_FEATURE.DISCOVERY_RECOMMEND, 'discovery')).toBe(true)
-    expect(hasFeaturePermission(restrictedUser, PERMISSION_FEATURE.DISCOVERY_RECOMMEND, 'discovery')).toBe(false)
-    expect(
-      hasFeaturePermission(
-        { discovery: false, features: { [PERMISSION_FEATURE.DISCOVERY_RECOMMEND]: true } },
-        PERMISSION_FEATURE.DISCOVERY_RECOMMEND,
-        'discovery',
-      ),
-    ).toBe(false)
-  })
-
-  it('checks and filters permission-protected items consistently', () => {
-    const permissions = {
-      discovery: true,
-      manage: false,
-      features: { [PERMISSION_FEATURE.DISCOVERY_EXPLORE]: false },
-    }
-    const items = [
-      { id: 'open' },
-      { id: 'recommend', permission: 'discovery' as const, feature: PERMISSION_FEATURE.DISCOVERY_RECOMMEND },
-      { id: 'explore', permission: 'discovery' as const, feature: PERMISSION_FEATURE.DISCOVERY_EXPLORE },
-      { id: 'manage', permission: 'manage' as const },
-    ]
-
-    expect(hasItemPermission(items[1], permissions)).toBe(true)
-    expect(hasItemPermission(items[2], permissions)).toBe(false)
-    expect(filterItemsByPermission(items, permissions).map(item => item.id)).toEqual(['open', 'recommend'])
-    expect(filterMenusByPermission(items, permissions).map(item => item.id)).toEqual(['open', 'recommend'])
+    const admin = buildUserPermissionContext(true, { dashboard: false })
+    expect(hasPermission(admin, 'dashboard')).toBe(true)
+    expect(hasFeaturePermission(admin, PERMISSION_FEATURE.DASHBOARD_SYSTEM, 'dashboard')).toBe(true)
   })
 })

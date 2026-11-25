@@ -640,7 +640,7 @@ describe('dashboard page initial layout', () => {
     await waitFor(() => expect(pluginTimerCallbacks()).toHaveLength(3))
   })
 
-  it('hides discovery content and dashboard controls without their permissions', async () => {
+  it('hides restricted cards and dashboard controls without their feature permissions', async () => {
     mocks.apiGet.mockImplementation((url: string) => {
       if (
         url === '/user/config/DashboardOrder' ||
@@ -654,11 +654,15 @@ describe('dashboard page initial layout', () => {
     })
 
     const { container } = await renderDashboard({
-      permissions: { admin: false, discovery: false },
+      permissions: { admin: false, dashboard: true, discovery: false },
       superUser: false,
     })
 
     expect(container.querySelector('[data-dashboard-id="mediaRecommend"]')).not.toBeInTheDocument()
+    expect(container.querySelector('[data-dashboard-id="systemInfo"]')).not.toBeInTheDocument()
+    expect(container.querySelector('[data-dashboard-id="recentImports"]')).not.toBeInTheDocument()
+    expect(container.querySelector('[data-dashboard-id="scheduler"]')).not.toBeInTheDocument()
+    expect(container.querySelector('[data-dashboard-id="storage"]')).toBeInTheDocument()
     expect(document.querySelector('.compact-fab-stack')).not.toBeInTheDocument()
   })
 

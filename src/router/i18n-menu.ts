@@ -28,7 +28,7 @@ export function getNavMenus(t: Composer['t']): NavMenu[] {
       header: t('menu.start'),
       admin: false,
       footer: true,
-      permission: 'admin',
+      permission: 'dashboard',
     },
     {
       title: t('navItems.searchResult'),

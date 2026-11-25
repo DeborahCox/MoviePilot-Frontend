@@ -219,6 +219,34 @@ describe('authentication route guard', () => {
     expect(routerMocks.next).toHaveBeenLastCalledWith()
   })
 
+  it('gates the dashboard route by the dashboard permission category', async () => {
+    const authStore = useAuthStore()
+    const userStore = useUserStore()
+    authStore.setToken('token')
+    userStore.setSuperUser(false)
+    userStore.setPermissions({ discovery: true, dashboard: false })
+
+    const dashboardRoute = route({
+      fullPath: '/dashboard',
+      meta: { requiresAuth: true, permission: 'dashboard' },
+      path: '/dashboard',
+    })
+
+    routerMocks.next.mockClear()
+    await runGuard(dashboardRoute)
+    expect(routerMocks.next).toHaveBeenLastCalledWith('/apps')
+
+    routerMocks.next.mockClear()
+    userStore.setPermissions({ discovery: true, dashboard: true })
+    await runGuard(dashboardRoute)
+    expect(routerMocks.next).toHaveBeenLastCalledWith()
+
+    routerMocks.next.mockClear()
+    userStore.setPermissions({ features: { 'dashboard.media': true } })
+    await runGuard(dashboardRoute)
+    expect(routerMocks.next).toHaveBeenLastCalledWith()
+  })
+
   it('clears the navigation state after a completed route', () => {
     vi.useFakeTimers()
 

@@ -1,5 +1,5 @@
 // 权限类型定义
-export type UserPermissionCategoryKey = 'discovery' | 'search' | 'subscribe' | 'manage'
+export type UserPermissionCategoryKey = 'discovery' | 'search' | 'subscribe' | 'manage' | 'dashboard'
 export type UserPermissionKey = UserPermissionCategoryKey | 'admin'
 export type UserPermissionFeatureKey = string
 export type UserPermissionFeatureMap = Record<UserPermissionFeatureKey, boolean>
@@ -11,6 +11,8 @@ export interface UserPermissionFeatureOption {
   descriptionKey: string
   icon: string
   path?: string
+  /** 普通用户开启所属分类时该功能的默认状态，未声明时默认开启。 */
+  defaultEnabledForMember?: boolean
 }
 
 export interface UserPermissions {
@@ -18,6 +20,7 @@ export interface UserPermissions {
   search: boolean // 搜索权限
   subscribe: boolean // 订阅权限
   manage: boolean // 管理权限
+  dashboard: boolean // 仪表盘权限，独立于管理权限
   admin?: boolean // 管理员权限，仅用于前端入口标识，实际由 is_superuser 决定
   features?: UserPermissionFeatureMap // 功能级权限，缺省功能默认继承分类权限
 }
@@ -39,6 +42,12 @@ export const PERMISSION_FEATURE = {
   MANAGE_HISTORY: 'manage.history',
   MANAGE_FILEMANAGER: 'manage.filemanager',
   MANAGE_SITE: 'manage.site',
+  DASHBOARD_MEDIA: 'dashboard.media',
+  DASHBOARD_RUNTIME: 'dashboard.runtime',
+  DASHBOARD_SCHEDULER: 'dashboard.scheduler',
+  DASHBOARD_RECENT_IMPORTS: 'dashboard.recentImports',
+  DASHBOARD_SYSTEM: 'dashboard.system',
+  DASHBOARD_CUSTOMIZE: 'dashboard.customize',
 } as const
 
 export const USER_PERMISSION_FEATURES: UserPermissionFeatureOption[] = [
@@ -146,11 +155,67 @@ export const USER_PERMISSION_FEATURES: UserPermissionFeatureOption[] = [
     icon: 'mdi-web',
     path: '/site',
   },
+  {
+    key: PERMISSION_FEATURE.DASHBOARD_MEDIA,
+    permission: 'dashboard',
+    titleKey: 'dialog.userAddEdit.permissions.features.dashboardMedia',
+    descriptionKey: 'dialog.userAddEdit.permissions.featureDescriptions.dashboardMedia',
+    icon: 'mdi-chart-line',
+    path: '/dashboard',
+  },
+  {
+    key: PERMISSION_FEATURE.DASHBOARD_RUNTIME,
+    permission: 'dashboard',
+    titleKey: 'dialog.userAddEdit.permissions.features.dashboardRuntime',
+    descriptionKey: 'dialog.userAddEdit.permissions.featureDescriptions.dashboardRuntime',
+    icon: 'mdi-speedometer',
+    path: '/dashboard',
+  },
+  {
+    key: PERMISSION_FEATURE.DASHBOARD_SCHEDULER,
+    permission: 'dashboard',
+    titleKey: 'dialog.userAddEdit.permissions.features.dashboardScheduler',
+    descriptionKey: 'dialog.userAddEdit.permissions.featureDescriptions.dashboardScheduler',
+    icon: 'mdi-calendar-clock',
+    path: '/dashboard',
+    defaultEnabledForMember: false,
+  },
+  {
+    key: PERMISSION_FEATURE.DASHBOARD_RECENT_IMPORTS,
+    permission: 'dashboard',
+    titleKey: 'dialog.userAddEdit.permissions.features.dashboardRecentImports',
+    descriptionKey: 'dialog.userAddEdit.permissions.featureDescriptions.dashboardRecentImports',
+    icon: 'mdi-tray-arrow-down',
+    path: '/dashboard',
+    defaultEnabledForMember: false,
+  },
+  {
+    key: PERMISSION_FEATURE.DASHBOARD_SYSTEM,
+    permission: 'dashboard',
+    titleKey: 'dialog.userAddEdit.permissions.features.dashboardSystem',
+    descriptionKey: 'dialog.userAddEdit.permissions.featureDescriptions.dashboardSystem',
+    icon: 'mdi-information-outline',
+    path: '/dashboard',
+    defaultEnabledForMember: false,
+  },
+  {
+    key: PERMISSION_FEATURE.DASHBOARD_CUSTOMIZE,
+    permission: 'dashboard',
+    titleKey: 'dialog.userAddEdit.permissions.features.dashboardCustomize',
+    descriptionKey: 'dialog.userAddEdit.permissions.featureDescriptions.dashboardCustomize',
+    icon: 'mdi-view-dashboard-edit',
+    path: '/dashboard',
+    defaultEnabledForMember: false,
+  },
 ]
 
-/** 构造功能级权限默认值，新建用户默认不收窄已拥有的分类权限。 */
+/**
+ * 构造功能级权限默认值：管理员全开；普通用户按各功能项的安全默认值为准。
+ */
 export function buildDefaultFeaturePermissions(enabled = true): UserPermissionFeatureMap {
-  return Object.fromEntries(USER_PERMISSION_FEATURES.map(feature => [feature.key, enabled]))
+  return Object.fromEntries(
+    USER_PERMISSION_FEATURES.map(feature => [feature.key, enabled ? true : (feature.defaultEnabledForMember ?? true)]),
+  )
 }
 
 /** 构造插件导航的功能权限键，供动态插件入口复用。 */
@@ -163,21 +228,37 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
+/** 仪表盘功能键集合，用于兼容旧后端丢弃分类字段但保留功能开关的权限数据。 */
+const DASHBOARD_FEATURE_KEYS = USER_PERMISSION_FEATURES.filter(feature => feature.permission === 'dashboard').map(
+  feature => feature.key,
+)
+
+/** 判断旧权限数据是否通过显式功能开关授予了仪表盘访问权限。 */
+function hasExplicitDashboardFeature(features: Record<string, unknown>): boolean {
+  return DASHBOARD_FEATURE_KEYS.some(key => features[key] === true)
+}
+
 /** 规整用户权限数据，兼容没有 features 字段的历史用户。 */
 export function normalizeUserPermissions(
   permissions: Partial<UserPermissions> | null | undefined = {},
 ): UserPermissions {
   const permissionData = permissions ?? {}
   const rawFeatures = isRecord(permissionData.features) ? permissionData.features : {}
-  const features = Object.fromEntries(
-    Object.entries(rawFeatures).filter(([, value]) => typeof value === 'boolean'),
-  ) as UserPermissionFeatureMap
+  const features = {
+    ...buildDefaultFeaturePermissions(false),
+    ...Object.fromEntries(Object.entries(rawFeatures).filter(([, value]) => typeof value === 'boolean')),
+  } as UserPermissionFeatureMap
+  // 旧后端 Schema 会丢弃 dashboard 分类但保留 dashboard.* 功能键；
+  // 仅在分类字段缺失时依据显式开启的功能恢复入口，显式 false 仍然拒绝。
+  const dashboardPermission =
+    typeof permissionData.dashboard === 'boolean' ? permissionData.dashboard : hasExplicitDashboardFeature(rawFeatures)
 
   return {
     discovery: permissionData.discovery ?? DEFAULT_PERMISSIONS.discovery,
     search: permissionData.search ?? DEFAULT_PERMISSIONS.search,
     subscribe: permissionData.subscribe ?? DEFAULT_PERMISSIONS.subscribe,
     manage: permissionData.manage ?? DEFAULT_PERMISSIONS.manage,
+    dashboard: dashboardPermission,
     admin: permissionData.admin ?? DEFAULT_PERMISSIONS.admin,
     features,
   }
@@ -200,8 +281,9 @@ export const DEFAULT_PERMISSIONS: UserPermissions = {
   search: true,
   subscribe: true,
   manage: false,
+  dashboard: false,
   admin: false,
-  features: {},
+  features: buildDefaultFeaturePermissions(false),
 }
 
 // 管理员权限配置
@@ -210,6 +292,7 @@ export const ADMIN_PERMISSIONS: UserPermissions = {
   search: true,
   subscribe: true,
   manage: true,
+  dashboard: true,
   admin: true,
   features: buildDefaultFeaturePermissions(),
 }

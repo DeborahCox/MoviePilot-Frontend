@@ -60,29 +60,23 @@ describe('dashboard recent imports', () => {
     mocks.formatDateDifference.mockClear()
   })
 
-  it('loads ten successful records once on an ordinary mount', async () => {
-    mocks.apiGet.mockResolvedValue({
-      data: {
-        list: [{ id: 1, title: '异步入库记录' }],
-      },
-    })
+  it('loads ten successful records once through the dashboard endpoint', async () => {
+    mocks.apiGet.mockResolvedValue([{ id: 1, title: '异步入库记录' }])
 
     const { container } = await renderRecentImports()
 
     const renderedItem = await screen.findByText('异步入库记录')
     expect(container.querySelector('[data-layout-size-source]')).toContainElement(renderedItem)
     expect(mocks.apiGet).toHaveBeenCalledOnce()
-    expect(mocks.apiGet).toHaveBeenCalledWith('history/transfer', {
-      params: { page: 1, count: 10, status: true },
+    expect(mocks.apiGet).toHaveBeenCalledWith('dashboard/recent-imports', {
+      params: { count: 10 },
     })
   })
 
   it('limits rendering to ten records when the response contains more items', async () => {
-    mocks.apiGet.mockResolvedValue({
-      data: {
-        list: Array.from({ length: 11 }, (_, index) => ({ id: index + 1, title: `整理记录 ${index + 1}` })),
-      },
-    })
+    mocks.apiGet.mockResolvedValue(
+      Array.from({ length: 11 }, (_, index) => ({ id: index + 1, title: `整理记录 ${index + 1}` })),
+    )
 
     const { container } = await renderRecentImports()
 
@@ -94,8 +88,8 @@ describe('dashboard recent imports', () => {
   it.each([
     ['empty', []],
     ['null', null],
-  ])('shows the empty state when the response list is %s', async (_label, list) => {
-    mocks.apiGet.mockResolvedValue({ data: { list } })
+  ])('shows the empty state when the response is %s', async (_label, response) => {
+    mocks.apiGet.mockResolvedValue(response)
 
     const { container } = await renderRecentImports()
 
@@ -104,16 +98,41 @@ describe('dashboard recent imports', () => {
     expect(container.querySelector('[data-layout-size-source]')).not.toBeInTheDocument()
   })
 
+  it('falls back to legacy transfer history without surfacing a 404', async () => {
+    const transferDate = '2026-08-19T07:30:00Z'
+    mocks.apiGet.mockRejectedValueOnce(Object.assign(new Error('not found'), { status: 404 })).mockResolvedValueOnce({
+      list: [
+        {
+          id: 1,
+          date: transferDate,
+          episodes: 'E03',
+          seasons: 'S01',
+          src_fileitem: { size: 1536 },
+          title: '兼容旧后端的记录',
+          type: '电视剧',
+          year: '2025',
+        },
+      ],
+    })
+
+    await renderRecentImports()
+
+    expect(await screen.findByText('兼容旧后端的记录')).toHaveTextContent('兼容旧后端的记录 (2025)')
+    expect(screen.getByText('电视剧 · S01 · E03 · 1.50 KB')).toBeInTheDocument()
+    expect(mocks.apiGet).toHaveBeenNthCalledWith(1, 'dashboard/recent-imports', {
+      params: { count: 10 },
+    })
+    expect(mocks.apiGet).toHaveBeenNthCalledWith(2, 'history/transfer', {
+      params: { page: 1, count: 10, status: true },
+    })
+  })
+
   it('uses the image proxy for posters and the local fallback when no poster exists', async () => {
     const remotePoster = 'https://example.com/poster image.jpg?size=large&lang=zh'
-    mocks.apiGet.mockResolvedValue({
-      data: {
-        list: [
-          { id: 1, image: remotePoster, title: '远端海报' },
-          { id: 2, title: '默认海报' },
-        ],
-      },
-    })
+    mocks.apiGet.mockResolvedValue([
+      { id: 1, image: remotePoster, title: '远端海报' },
+      { id: 2, title: '默认海报' },
+    ])
 
     await renderRecentImports()
 
@@ -126,22 +145,18 @@ describe('dashboard recent imports', () => {
 
   it('renders the year, relative date and available transfer metadata', async () => {
     const transferDate = '2026-08-19T07:30:00Z'
-    mocks.apiGet.mockResolvedValue({
-      data: {
-        list: [
-          {
-            id: 1,
-            date: transferDate,
-            episodes: 'E03',
-            seasons: 'S01',
-            src_fileitem: { size: 1536 },
-            title: '测试剧集',
-            type: '电视剧',
-            year: '2025',
-          },
-        ],
+    mocks.apiGet.mockResolvedValue([
+      {
+        id: 1,
+        date: transferDate,
+        episodes: 'E03',
+        seasons: 'S01',
+        size: 1536,
+        title: '测试剧集',
+        type: '电视剧',
+        year: '2025',
       },
-    })
+    ])
 
     await renderRecentImports()
 
@@ -152,40 +167,35 @@ describe('dashboard recent imports', () => {
   })
 
   it('shows normalized audio specs for recent music imports', async () => {
-    mocks.apiGet.mockResolvedValue({
-      data: {
-        list: [
-          {
-            id: 2,
-            title: '晴天',
-            type: '音乐',
-            audio_format: 'FLAC',
-            bit_depth: 24,
-            sample_rate: 96_000,
-            bitrate: 2_304_000,
-          },
-        ],
+    mocks.apiGet.mockResolvedValue([
+      {
+        id: 2,
+        title: '晴天',
+        type: '音乐',
+        audio_specs: 'FLAC · 24-bit · 96 kHz · 2,304 kbps',
       },
-    })
+    ])
 
     await renderRecentImports()
 
     expect(await screen.findByText(/FLAC · 24-bit · 96 kHz · 2,304 kbps/)).toBeInTheDocument()
   })
 
-  it('keeps the empty state when the request fails', async () => {
+  it('keeps the empty state when a non-404 request fails', async () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
     mocks.apiGet.mockRejectedValue(new Error('remote unavailable'))
 
     const { container } = await renderRecentImports()
 
     await waitFor(() => expect(consoleError).toHaveBeenCalledOnce())
+    expect(mocks.apiGet).toHaveBeenCalledOnce()
     expect(screen.getByText('暂无近期整理记录')).toBeInTheDocument()
     expect(container.querySelector('[data-layout-size-source]')).not.toBeInTheDocument()
+    consoleError.mockRestore()
   })
 
   it('loads once initially and refreshes once after KeepAlive reactivation', async () => {
-    mocks.apiGet.mockResolvedValue({ data: { list: [] } })
+    mocks.apiGet.mockResolvedValue([])
 
     await renderRecentImports(KeepAliveHarness)
 

@@ -36,6 +36,27 @@ const fallbackMessageKeys: Record<ApiFallbackMessageKey, string> = {
   timeout: 'common.requestTimeout',
 }
 
+/** 仪表盘 403 统一提示的时间窗口，避免并发卡片逐条弹窗。 */
+const DASHBOARD_FORBIDDEN_NOTICE_INTERVAL = 30_000
+let lastDashboardForbiddenNoticeAt = 0
+
+/** 判断请求是否属于仪表盘数据接口。 */
+function isDashboardRequest(url?: string): boolean {
+  return Boolean(url?.startsWith('dashboard/'))
+}
+
+/** 普通用户访问旧后端仪表盘接口时只提示一次版本不匹配，不逐卡片弹窗。 */
+function handleForbidden(error: ApiRequestError): boolean {
+  if (!isDashboardRequest(error.config?.url)) return false
+
+  const now = Date.now()
+  if (now - lastDashboardForbiddenNoticeAt >= DASHBOARD_FORBIDDEN_NOTICE_INTERVAL) {
+    lastDashboardForbiddenNoticeAt = now
+    toast.error(i18n.global.t('dashboard.backendPermissionUnsupported'))
+  }
+  return true
+}
+
 /** 只有认证失效（401）才清理会话并回到登录页；授权拒绝（403）保留会话交给业务处理。 */
 function handleUnauthorized(): true {
   const authStore = useAuthStore()
@@ -62,6 +83,7 @@ const { api, pluginApi } = createApiClients({
   hooks: {
     markServerOnline: globalOfflineStatus.markServerOnline,
     reportConnectionFailure: globalOfflineStatus.reportNetworkError,
+    onForbidden: handleForbidden,
     onUnauthorized: handleUnauthorized,
   },
   notifier: {

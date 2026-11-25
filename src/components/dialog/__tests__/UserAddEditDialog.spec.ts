@@ -181,6 +181,32 @@ describe('UserAddEditDialog', () => {
     })
   })
 
+  it('uses safe defaults for dashboard feature permissions when adding a user', async () => {
+    mocks.apiPost.mockResolvedValue({ success: true })
+    await renderDialog('add')
+    await fillAddForm('dashboard-user')
+
+    const dashboardCategory = screen.getByRole('button', { name: /^仪表盘 / })
+    await fireEvent.click(dashboardCategory)
+
+    const runtimeFeature = screen.getAllByRole('checkbox').find(element => element.textContent?.includes('资源概览'))
+    const systemFeature = screen.getAllByRole('checkbox').find(element => element.textContent?.includes('系统信息'))
+    expect(runtimeFeature).toBeDefined()
+    expect(systemFeature).toBeDefined()
+    expect(runtimeFeature).toHaveAttribute('aria-checked', 'true')
+    expect(systemFeature).toHaveAttribute('aria-checked', 'false')
+
+    await fireEvent.click(screen.getByRole('button', { name: '添加' }))
+    await waitFor(() => expect(mocks.apiPost).toHaveBeenCalledOnce())
+    expect(mocks.apiPost.mock.calls[0][1].permissions).toMatchObject({
+      dashboard: false,
+      features: {
+        'dashboard.runtime': true,
+        'dashboard.system': false,
+      },
+    })
+  })
+
   it('toggles password visibility through the form controls', async () => {
     await renderDialog('add')
     const password = screen.getByLabelText('密码')

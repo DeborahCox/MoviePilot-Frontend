@@ -61,7 +61,7 @@ const router = createRouter({
           meta: {
             keepAlive: true,
             requiresAuth: true,
-            permission: 'admin',
+            permission: 'dashboard',
           },
         },
         {

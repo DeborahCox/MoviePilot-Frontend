@@ -5,6 +5,7 @@ import { useBackground } from '@/composables/useBackground'
 import { useSystemUpdateStatus } from '@/composables/useSystemUpdateStatus'
 import { useI18n } from 'vue-i18n'
 import { useToast } from 'vue-toastification'
+import { useUserStore } from '@/stores'
 
 const props = defineProps({
   // 是否允许刷新数据
@@ -18,6 +19,7 @@ const { t } = useI18n()
 const toast = useToast()
 const { useDataRefresh } = useBackground()
 const { checking: updateChecking, checkStatus: checkSystemUpdateStatus } = useSystemUpdateStatus()
+const canCheckUpdate = computed(() => useUserStore().superUser)
 
 // 系统摘要与本地运行时间校准点。
 const systemInfo = ref<DashboardSystemInfo | null>(null)
@@ -112,6 +114,7 @@ onBeforeUnmount(() => {
         <span>{{ t('dashboard.systemInfo.version') }}</span>
         <strong>{{ systemInfo?.version || '—' }}</strong>
         <VBtn
+          v-if="canCheckUpdate"
           size="small"
           variant="text"
           color="primary"

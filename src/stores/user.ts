@@ -1,7 +1,7 @@
 import { clearSharedDialogs } from '@/composables/useSharedDialog'
 import { defineStore } from 'pinia'
 import type { userState } from '@/stores/types'
-import { DEFAULT_PERMISSIONS } from '@/utils/permission'
+import { DEFAULT_PERMISSIONS, normalizeUserPermissions } from '@/utils/permission'
 
 export const useUserStore = defineStore('user', {
   state: (): userState => ({
@@ -37,11 +37,7 @@ export const useUserStore = defineStore('user', {
       this.level = level
     },
     setPermissions(permissions: object) {
-      const mergedPermissions = { ...DEFAULT_PERMISSIONS, ...permissions }
-      this.permissions = {
-        ...mergedPermissions,
-        features: { ...mergedPermissions.features },
-      }
+      this.permissions = normalizeUserPermissions(permissions)
     },
     loginUser(payload: userState) {
       this.setSuperUser(payload.superUser)

@@ -11,7 +11,7 @@ import { useI18n } from 'vue-i18n'
 import { usePWA } from '@/composables/usePWA'
 import { openSharedDialog } from '@/composables/useSharedDialog'
 import { usePluginRuntimeStore, useUserStore } from '@/stores'
-import { buildUserPermissionContext, hasPermission } from '@/utils/permission'
+import { buildUserPermissionContext, hasFeaturePermission, hasPermission, PERMISSION_FEATURE } from '@/utils/permission'
 import { globalLoadingStateManager } from '@/utils/loadingStateManager'
 import { useDisplay, useTheme } from 'vuetify'
 import { onBeforeRouteLeave } from 'vue-router'
@@ -30,8 +30,29 @@ const vuetifyTheme = useTheme()
 const userStore = useUserStore()
 const pluginRuntimeStore = usePluginRuntimeStore()
 const userPermissionContext = computed(() => buildUserPermissionContext(userStore.superUser, userStore.permissions))
-const canAdmin = computed(() => hasPermission(userPermissionContext.value, 'admin'))
 const canDiscovery = computed(() => hasPermission(userPermissionContext.value, 'discovery'))
+const canCustomizeDashboard = computed(() =>
+  hasFeaturePermission(userPermissionContext.value, PERMISSION_FEATURE.DASHBOARD_CUSTOMIZE, 'dashboard'),
+)
+
+/** 仪表盘卡片与功能级权限的对应关系；未列出的插件卡片只受 dashboard 分类约束。 */
+const DASHBOARD_CARD_FEATURES: Record<string, string> = {
+  mediaStatistic: PERMISSION_FEATURE.DASHBOARD_MEDIA,
+  mediaRecommend: PERMISSION_FEATURE.DASHBOARD_MEDIA,
+  library: PERMISSION_FEATURE.DASHBOARD_MEDIA,
+  playing: PERMISSION_FEATURE.DASHBOARD_MEDIA,
+  latest: PERMISSION_FEATURE.DASHBOARD_MEDIA,
+  storage: PERMISSION_FEATURE.DASHBOARD_RUNTIME,
+  speed: PERMISSION_FEATURE.DASHBOARD_RUNTIME,
+  cpu: PERMISSION_FEATURE.DASHBOARD_RUNTIME,
+  memory: PERMISSION_FEATURE.DASHBOARD_RUNTIME,
+  network: PERMISSION_FEATURE.DASHBOARD_RUNTIME,
+  weeklyOverview: PERMISSION_FEATURE.DASHBOARD_RECENT_IMPORTS,
+  recentImports: PERMISSION_FEATURE.DASHBOARD_RECENT_IMPORTS,
+  scheduler: PERMISSION_FEATURE.DASHBOARD_SCHEDULER,
+  quickActions: PERMISSION_FEATURE.DASHBOARD_SYSTEM,
+  systemInfo: PERMISSION_FEATURE.DASHBOARD_SYSTEM,
+}
 
 // 路由
 const route = useRoute()
@@ -342,12 +363,17 @@ let acceptedPluginDashboardMetaGeneration = 0
 // 当前启用且可渲染的仪表板 Grid 项。
 const dashboardGridItems = computed<DashboardGridItem[]>(() =>
   dashboardConfigs.value
-    .filter(
-      item =>
+    .filter(item => {
+      const requiredFeature = DASHBOARD_CARD_FEATURES[item.id]
+      const hasCardFeature =
+        !requiredFeature || hasFeaturePermission(userPermissionContext.value, requiredFeature, 'dashboard')
+      return (
         enableConfig.value[buildPluginDashboardId(item.id, item.key)] &&
         item.cols &&
-        (item.id !== 'mediaRecommend' || canDiscovery.value),
-    )
+        (item.id !== 'mediaRecommend' || canDiscovery.value) &&
+        hasCardFeature
+      )
+    })
     .map(item => {
       const id = buildPluginDashboardId(item.id, item.key)
 
@@ -1095,7 +1121,8 @@ const dashboardDynamicButtonMenuItems = computed<DynamicButtonMenuItem[] | undef
       title: isLayoutEditing.value ? t('dashboard.exitEditMode') : t('dashboard.editLayout'),
       icon: isLayoutEditing.value ? 'mdi-check' : 'mdi-view-dashboard-edit',
       color: 'primary',
-      permission: 'admin',
+      permission: 'dashboard',
+      feature: PERMISSION_FEATURE.DASHBOARD_CUSTOMIZE,
       action: toggleDashboardLayoutEditing,
     },
   ]
@@ -1105,7 +1132,8 @@ const dashboardDynamicButtonMenuItems = computed<DynamicButtonMenuItem[] | undef
       title: t('dashboard.resetLayout'),
       icon: 'mdi-restore',
       color: 'warning',
-      permission: 'admin',
+      permission: 'dashboard',
+      feature: PERMISSION_FEATURE.DASHBOARD_CUSTOMIZE,
       action: resetDashboardGridLayout,
     })
   }
@@ -1114,7 +1142,8 @@ const dashboardDynamicButtonMenuItems = computed<DynamicButtonMenuItem[] | undef
     title: t('dashboard.settings'),
     icon: 'mdi-tune',
     color: 'info',
-    permission: 'admin',
+    permission: 'dashboard',
+    feature: PERMISSION_FEATURE.DASHBOARD_CUSTOMIZE,
     action: openDashboardSettings,
   })
 
@@ -1124,7 +1153,8 @@ const dashboardDynamicButtonMenuItems = computed<DynamicButtonMenuItem[] | undef
 useDynamicButton({
   icon: 'mdi-view-dashboard-edit',
   menuItems: dashboardDynamicButtonMenuItems,
-  permission: 'admin',
+  permission: 'dashboard',
+  feature: PERMISSION_FEATURE.DASHBOARD_CUSTOMIZE,
   show: computed(() => appMode.value && route.path === '/dashboard'),
 })
 
@@ -2021,7 +2051,7 @@ onBeforeUnmount(() => {
   </div>
 
   <Teleport to="body" v-if="!appMode && route.path === '/dashboard'">
-    <div v-if="canAdmin" class="compact-fab-stack">
+    <div v-if="canCustomizeDashboard" class="compact-fab-stack">
       <VFab
         icon="mdi-tune"
         color="info"

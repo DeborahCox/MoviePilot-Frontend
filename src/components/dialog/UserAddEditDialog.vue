@@ -90,7 +90,8 @@ const userForm = ref<ExtendedUser>({
     search: true,
     subscribe: true,
     manage: false,
-    features: buildDefaultFeaturePermissions(),
+    dashboard: false,
+    features: buildDefaultFeaturePermissions(false),
   },
   settings: {
     wechat_userid: null,
@@ -129,6 +130,12 @@ const permissionOptions = [
     title: t('dialog.userAddEdit.permissions.manage'),
     description: t('dialog.userAddEdit.permissions.manageDesc'),
     icon: 'mdi-cog-outline',
+  },
+  {
+    key: 'dashboard',
+    title: t('dialog.userAddEdit.permissions.dashboard'),
+    description: t('dialog.userAddEdit.permissions.dashboardDesc'),
+    icon: 'mdi-view-dashboard-outline',
   },
 ] as const
 
@@ -233,9 +240,17 @@ function setCategoryFeatures(permission: UserPermissionCategoryKey, enabled: boo
   }
 }
 
-/** 将当前分类下的功能项恢复为默认全选状态。 */
+/** 将当前分类下的功能项恢复为安全默认值。 */
 function resetCategoryFeatures(permission: UserPermissionCategoryKey) {
-  setCategoryFeatures(permission, true)
+  const defaults = buildDefaultFeaturePermissions(false)
+  const nextFeatures = { ...(userPermissions.value.features ?? {}) }
+  for (const feature of permissionFeatureOptions.value.filter(item => item.permission === permission)) {
+    nextFeatures[feature.key] = defaults[feature.key] ?? true
+  }
+  userPermissions.value = {
+    ...userPermissions.value,
+    features: nextFeatures,
+  }
 }
 
 /** 校验并读取用户上传的新头像。 */
