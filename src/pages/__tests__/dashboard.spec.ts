@@ -666,6 +666,50 @@ describe('dashboard page initial layout', () => {
     expect(document.querySelector('.compact-fab-stack')).not.toBeInTheDocument()
   })
 
+  it('hides admin-only quick actions from the dashboard and settings for regular users', async () => {
+    mocks.apiGet.mockImplementation((url: string) => {
+      if (
+        url === '/user/config/DashboardOrder' ||
+        url === '/user/config/DashboardGridLayout' ||
+        url === '/user/config/Dashboard'
+      ) {
+        return { data: {} }
+      }
+      if (url === '/plugin/dashboard/meta') return []
+      throw new Error('Unexpected GET ' + url)
+    })
+
+    const { container } = await renderDashboard({
+      permissions: {
+        admin: false,
+        dashboard: true,
+        features: {
+          'dashboard.customize': true,
+          'dashboard.system': true,
+        },
+      },
+      superUser: false,
+    })
+
+    expect(container.querySelector('[data-dashboard-id="quickActions"]')).not.toBeInTheDocument()
+    expect(container.querySelector('[data-dashboard-id="systemInfo"]')).toBeInTheDocument()
+
+    const settingsButton = await waitFor(() => {
+      const button = document.querySelector<HTMLElement>('.compact-fab-stack .compact-fab--secondary')
+      expect(button).toBeInTheDocument()
+      return button!
+    })
+    mocks.openSharedDialog.mockClear()
+    await fireEvent.click(settingsButton)
+
+    expect(mocks.openSharedDialog).toHaveBeenCalledOnce()
+    const settingsProps = mocks.openSharedDialog.mock.calls[0]?.[1] as {
+      items: Array<{ id: string }>
+    }
+    expect(settingsProps.items.some(item => item.id === 'quickActions')).toBe(false)
+    expect(settingsProps.items.some(item => item.id === 'systemInfo')).toBe(true)
+  })
+
   it('disables automatic grid transitions only while browsing with the glass theme', async () => {
     mocks.themeName.value = 'glass'
     mocks.apiGet.mockImplementation((url: string) => {

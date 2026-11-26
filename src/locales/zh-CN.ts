@@ -1698,7 +1698,7 @@ export default {
     staleData: '刷新失败，当前显示上次数据',
     recentImports: '近期整理',
     viewAll: '查看全部',
-    settings: '设置仪表板',
+    settings: '设置仪表盘',
     chooseContent: '选择您想在页面显示的内容',
     editLayout: '编辑布局',
     exitEditMode: '完成编辑',

@@ -34,6 +34,8 @@ const canDiscovery = computed(() => hasPermission(userPermissionContext.value, '
 const canCustomizeDashboard = computed(() =>
   hasFeaturePermission(userPermissionContext.value, PERMISSION_FEATURE.DASHBOARD_CUSTOMIZE, 'dashboard'),
 )
+// 快捷操作内的全部工具都要求管理员权限，普通用户不显示空卡片和对应设置项。
+const canUseQuickActions = computed(() => userStore.superUser)
 
 /** 仪表盘卡片与功能级权限的对应关系；未列出的插件卡片只受 dashboard 分类约束。 */
 const DASHBOARD_CARD_FEATURES: Record<string, string> = {
@@ -371,6 +373,7 @@ const dashboardGridItems = computed<DashboardGridItem[]>(() =>
         enableConfig.value[buildPluginDashboardId(item.id, item.key)] &&
         item.cols &&
         (item.id !== 'mediaRecommend' || canDiscovery.value) &&
+        (item.id !== 'quickActions' || canUseQuickActions.value) &&
         hasCardFeature
       )
     })
@@ -383,6 +386,11 @@ const dashboardGridItems = computed<DashboardGridItem[]>(() =>
         widget: buildDashboardGridWidget(item, id),
       }
     }),
+)
+
+// 设置弹窗只展示当前用户实际可用的仪表盘组件。
+const dashboardSettingsItems = computed(() =>
+  dashboardConfigs.value.filter(item => item.id !== 'quickActions' || canUseQuickActions.value),
 )
 
 // 标记仪表板首屏仍在准备中，让 App 在页面实际可见前继续保留启动层。
@@ -1043,7 +1051,7 @@ function openDashboardSettings() {
     {
       enabled: enableConfig.value,
       hint: t('dashboard.chooseContent'),
-      items: dashboardConfigs.value,
+      items: dashboardSettingsItems.value,
       labelGetter: (item: DashboardItem) => item.attrs?.title ?? item.name,
       title: t('dashboard.settings'),
       valueGetter: (item: DashboardItem) => buildPluginDashboardId(item.id, item.key),
@@ -1065,7 +1073,7 @@ function openDashboardSettings() {
 function updateDashboardSettingsDialog() {
   settingsDialogController?.updateProps({
     enabled: enableConfig.value,
-    items: dashboardConfigs.value,
+    items: dashboardSettingsItems.value,
   })
 }
 
