@@ -10,12 +10,8 @@ import {
   shallowRef,
   type Component,
 } from 'vue'
-import { useTheme } from 'vuetify'
-import {
-  getFederationRemote,
-  setFederationRemote,
-  unwrapFederationDefault,
-} from '@/utils/federationRuntime'
+import { useDisplay, useTheme } from 'vuetify'
+import { getFederationRemote, setFederationRemote, unwrapFederationDefault } from '@/utils/federationRuntime'
 import { pluginHostBridge } from './bridgeClient'
 import {
   providePluginShellSDK,
@@ -40,6 +36,21 @@ import {
 } from './visualTheme'
 
 const theme = useTheme()
+const display = useDisplay()
+
+function syncViewportDisplay(): void {
+  if (typeof window === 'undefined') return
+  const width = window.innerWidth || document.documentElement?.clientWidth || 0
+  const height = window.innerHeight || document.documentElement?.clientHeight || 0
+  if (width > 0 && typeof document !== 'undefined') {
+    const isPortraitMobile = width < 768 || (width < 960 && height >= width)
+    document.documentElement.dataset.mpShellViewport = isPortraitMobile ? 'mobile-portrait' : 'expanded'
+  }
+  if (typeof display.update === 'function') {
+    display.update()
+  }
+  notifyEnvironmentChanged()
+}
 
 const mountStageRef = ref<HTMLElement | null>(null)
 const activeComponent = shallowRef<Component | null>(null)
@@ -89,6 +100,7 @@ if (typeof window !== 'undefined') {
 
 const {
   sdk: hostSdk,
+  nativeHost,
   toast,
   nativeSubscribe,
   subscriptionManager,
@@ -104,6 +116,10 @@ const {
     publishHeaderState()
   },
 })
+
+if (typeof window !== 'undefined') {
+  window.MoviePilotNativeCapabilities = nativeHost
+}
 
 let mountGeneration = 0
 
@@ -224,6 +240,7 @@ async function mountSurface(payload: PluginMountPayload, surface: PluginShellSur
   activeComponent.value = null
   inlineDialogs.value = []
   domHeaderButtons.value = new Map()
+  pluginHostBridge.clearDeviceEventListeners()
   clearRegisteredCommands()
 
   currentMount.value = payload
@@ -309,8 +326,10 @@ async function mountSurface(payload: PluginMountPayload, surface: PluginShellSur
   activeComponent.value = markRaw(resolved)
 
   await nextTick()
+  syncViewportDisplay()
   const notifyFrame = () => {
     if (generation !== mountGeneration) return
+    syncViewportDisplay()
     cleanOpaquePluginRoots(mountStageRef.value)
     extractFallbackDomHeader()
     const elapsed = Math.round((typeof performance !== 'undefined' ? performance.now() : Date.now()) - startedAt)
@@ -331,6 +350,7 @@ function handleUnmount(mountId?: string): void {
   if (mountId && currentMount.value && currentMount.value.mountId !== mountId) return
   mountGeneration += 1
   pluginHostBridge.abortAllPending('Plugin unmounted')
+  pluginHostBridge.clearDeviceEventListeners()
   activeComponent.value = null
   currentMount.value = null
   inlineDialogs.value = []
@@ -443,6 +463,7 @@ const surfaceProps = computed(() => {
     ...extra,
     api: scopedApi,
     hostSdk,
+    nativeHost,
     nativeSubscribe,
     subscriptionManager,
     pluginId: mount?.pluginId || '',
@@ -517,11 +538,24 @@ onErrorCaptured(error => {
   return false
 })
 
+let viewportResizeObserver: ResizeObserver | null = null
+
+const handleWindowResize = () => {
+  syncViewportDisplay()
+}
+
 onMounted(() => {
   pluginHostBridge.attachGlobalReceiver()
   applyNativeVisualTokens(theme, getDefaultVisualTokens())
+  syncViewportDisplay()
   if (typeof window !== 'undefined') {
     window.__mpPluginShellReady = true
+    window.addEventListener('resize', handleWindowResize, { passive: true })
+    window.addEventListener('orientationchange', handleWindowResize, { passive: true })
+  }
+  if (typeof ResizeObserver !== 'undefined' && mountStageRef.value) {
+    viewportResizeObserver = new ResizeObserver(() => syncViewportDisplay())
+    viewportResizeObserver.observe(mountStageRef.value)
   }
   pluginHostBridge.send('shell.ready', {
     shellVersion: typeof __APP_VERSION__ === 'string' ? __APP_VERSION__.replace(/^v/, '') : '3.0.0',
@@ -530,6 +564,12 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  if (typeof window !== 'undefined') {
+    window.removeEventListener('resize', handleWindowResize)
+    window.removeEventListener('orientationchange', handleWindowResize)
+  }
+  viewportResizeObserver?.disconnect()
+  viewportResizeObserver = null
   unsubscribeHost()
   pluginHostBridge.abortAllPending('Shell disposed')
 })
